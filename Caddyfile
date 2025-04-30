@@ -1,0 +1,37 @@
+:3000 {
+    
+    encode gzip
+
+    route /api/* {
+        reverse_proxy backend:8000
+    }
+
+    route /docs* {
+        reverse_proxy backend:8000
+    }
+
+    route /openapi.json* {
+        reverse_proxy backend:8000
+    }
+
+    route /favicon.ico* {
+        reverse_proxy backend:8000
+    }
+
+    # db explorer
+    route /db-admin* { 
+        reverse_proxy db-explorer:8081
+    }
+
+    # prefect ui
+    route /prefect* { # Matcht /prefect und /prefect/...
+        reverse_proxy prefect:4200
+    }
+
+    # Finaler Catch-all für das Frontend
+    # Dieser route-Block hat keinen Matcher, fängt also alles ab,
+    # was von den oberen Blöcken nicht abgefangen wurde.
+    route {
+        reverse_proxy frontend:8050
+    }
+}

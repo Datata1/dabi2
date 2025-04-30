@@ -1,0 +1,150 @@
+# docker-compose.yaml
+version: '3.8' 
+
+services:
+  db:  # do we need some special extension?
+    image: timescale/timescaledb:latest-pg16 
+    container_name: dabi2-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-datata1}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-devpassword}
+      POSTGRES_DB: ${DB_NAME:-umwelt}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init_scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest 
+    container_name: redis_cache
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data 
+    ports: 
+      - "6379:6379"
+
+  # backend:
+  #   container_name: backend_fastapi
+  #   build:
+  #     context: .
+  #     dockerfile: ./services/backend/Dockerfile
+  #   volumes:
+  #     - ./services/backend:/app/backend
+  #     - ./shared:/app/backend/shared
+  #   command: uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+  #   environment:
+  #     - PREFECT_API_URL=http://prefect:4200/api
+  #   working_dir: /app/backend 
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy 
+  #     redis:
+  #       condition: service_started 
+  #     prefect:
+  #       condition: service_started
+  #     prefect-worker:
+  #       condition: service_started
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8000:8000"
+
+  # frontend:
+  #   container_name: frontend_dash
+  #   command: uv run python ./app.py
+  #   build:
+  #     context: .
+  #     dockerfile: ./services/frontend/Dockerfile
+  #   volumes:
+  #     - ./services/frontend:/app/frontend
+  #     - .shared:/app/frontend/shared
+  #   environment:
+  #     - BACKEND_API_URL=http://backend:8000
+  #   working_dir: /app/frontend 
+  #   depends_on:
+  #     - backend 
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8050:8050"
+
+  prefect:
+    container_name: prefect_server
+    image: prefecthq/prefect:3-latest 
+    command: prefect server start --host 0.0.0.0
+    environment:
+      - PREFECT_SERVER_DATABASE_CONNECTION_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${PREFECT_DB_NAME}
+      - PREFECT_API_URL=http://0.0.0.0:4200/api
+      - PREFECT_UI_SERVE_BASE=/prefect
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "4200:4200"
+
+  # prefect-worker:
+  #   container_name: prefect_worker
+  #   build:
+  #     context: . 
+  #     dockerfile: ./services/ml_service/Dockerfile 
+  #   volumes:
+  #     - ./services/ml_service:/app/ml_service 
+  #     - ./shared:/app/ml_service/shared
+  #   working_dir: /app/ml_service 
+  #   command: "uv run python run_worker.py"
+  #   environment:
+  #     - PREFECT_API_URL=http://prefect:4200/api
+  #     - DATABASE_URL_PREFECT=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${PREFECT_DB_NAME}
+  #     - PREFECT_WORKER_WEBSERVER_PORT=8001
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     prefect:
+  #       condition: service_started
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8001:8001"
+
+  db-explorer:
+    container_name: pgweb_explorer
+    image: sosedoff/pgweb:latest
+    command: pgweb --url=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?sslmode=disable --bind=0.0.0.0 --prefix=db-admin --skip-open
+    environment:
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=db
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    ports:
+      - "8081:8081" 
+
+  caddy:
+    container_name: caddy_proxy
+    image: caddy:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: 
+      - prefect
+      - db-explorer
+
+# --- Benannte Volumes für persistente Daten ---
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
