@@ -18,12 +18,11 @@ dependencies = [
     "seaborn>=0.13,<1",      
     "python-dotenv>=1.0,<2",  
     "sqlalchemy>=2.0,<3",     
-    # "psycopg2-binary",    
+    "psycopg2-binary",    
     "duckdb-engine",         
     "duckdb>=0.9,<1",        
-    # --- dbt Adapter ---
     "dbt-duckdb>=1.7,<2",    
-    # "dbt-postgres",       
+    "dbt-postgres",       
     "jupyterlab",            
     "openpyxl",              
 ]
