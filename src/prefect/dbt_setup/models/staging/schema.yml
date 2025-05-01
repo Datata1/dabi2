@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: raw_data 
+    schema: public 
+    tables:
+      - name: raw_orders
+        description: "Raw orders data from parquet file."
+      - name: raw_tips
+        description: "Raw tips data from csv file."
+      - name: raw_order_products
+        description: "Raw order products data from csv file."

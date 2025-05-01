@@ -5,3 +5,6 @@ deliverables/*.log
 deliverables/*.synctex.gz
 
 .venv
+.ipynb_checkpoints
+__pycache__
+*.pyc

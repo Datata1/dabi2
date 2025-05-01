@@ -11,14 +11,14 @@ from prefect.workers.process import ProcessWorker
 from prefect.filesystems import LocalFileSystem 
 from prefect.deployments.runner import RunnerDeployment
 
-from flows.test import test_flow as target_flow
+from flows.data_pipeline import data_pipeline as target_flow
 
 # --- Konfiguration --- TODO: hole die konfigurationen aus .env oder utils.config.settings()
 WORK_POOL_NAME = "dabi2"
 DEPLOYMENT_NAME = "dabi2-test-deployment"
-FLOW_SCRIPT_PATH = Path("./flows/test.py") 
-FLOW_FUNCTION_NAME = "test_flow" 
-FLOW_ENTRYPOINT = f"./flows/test.py:{FLOW_FUNCTION_NAME}" 
+FLOW_SCRIPT_PATH = Path("./flows/data_pipeline.py") 
+FLOW_FUNCTION_NAME = "data_pipeline" 
+FLOW_ENTRYPOINT = f"./flows/data_pipeline.py:{FLOW_FUNCTION_NAME}" 
 APP_BASE_PATH = Path("/app/prefect/") 
 # INTERVAL_SECONDS = 180
 
@@ -67,8 +67,8 @@ async def main():
         #         },
         #     }
         # ]
-        deployment_tags = ["dabi2"]
-        deployment_description = f"test deployment"
+        deployment_tags = ["dabi2", "data-ingestion", "initial_dwh_setup"]
+        deployment_description = f"data ingestion pipeline for dabi2"
 
         flow_id = await client.create_flow_from_name(FLOW_FUNCTION_NAME)
 
@@ -80,11 +80,21 @@ async def main():
                 "flow_id": str(flow_id),  # requests cant handle uuid 
                 "work_pool_name": WORK_POOL_NAME,
                 "entrypoint": FLOW_ENTRYPOINT,
+                "enforce_parameter_schema": False,
                 "path": str(APP_BASE_PATH),  # reguetsts cant handle Path objects
                 "tags": deployment_tags,
                 "description": deployment_description,
             },
             headers={"Content-Type": "application/json"},
+        )
+
+        deployment = deployment.json()
+
+        # --- start flow run ---
+        await client.create_flow_run_from_deployment(
+            deployment_id=deployment.get("id"),
+            tags=deployment_tags,
+            name="initial_loader",
         )
 
     print(f"Deployment '{DEPLOYMENT_NAME}' (ID: {deployment}) erfolgreich erstellt.")

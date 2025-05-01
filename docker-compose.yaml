@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_USER: ${DB_USER:-datata1}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-devpassword}
-      POSTGRES_DB: ${DB_NAME:-umwelt}
+      POSTGRES_DB: ${DB_NAME:-dwh_dabi}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init_scripts:/docker-entrypoint-initdb.d
@@ -17,7 +17,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
 
@@ -95,12 +95,18 @@ services:
       dockerfile: ./src/prefect/Dockerfile 
     volumes:
       - ./src/prefect:/app/prefect 
+      - ./data:/app/data
     working_dir: /app/prefect
     command: "uv run python run_worker.py"
     environment:
       - PREFECT_API_URL=http://prefect:4200/api
       - DATABASE_URL_PREFECT=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${PREFECT_DB_NAME}
       - PREFECT_WORKER_WEBSERVER_PORT=8001
+      - PG_DWH_HOST=db
+      - PG_DWH_PORT=${DB_PORT:-5432}
+      - PG_DWH_USER=${DB_USER:-datata1}
+      - PG_DWH_PASSWORD=${DB_PASSWORD:-devpassword}
+      - PG_DWH_DBNAME=${DB_NAME:-dwh_dabi}
     depends_on:
       db:
         condition: service_healthy

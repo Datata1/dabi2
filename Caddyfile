@@ -2,6 +2,10 @@
     
     encode gzip
 
+    log {
+        output discard 
+    }
+
     route /api/* {
         reverse_proxy backend:8000
     }

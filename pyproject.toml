@@ -27,7 +27,9 @@ dependencies = [
     "openpyxl",
     "ipykernel",
     "jupyter", 
-    "pydantic_settings",             
+    "pydantic_settings",  
+    "pyarrow",
+    "fastparquet",          
 ]
 
 [project.optional-dependencies]

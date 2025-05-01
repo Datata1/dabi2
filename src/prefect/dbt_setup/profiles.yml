@@ -1,0 +1,15 @@
+# Inhalt für ./src/prefect/dbt_setup/profiles.yml
+
+# Profilname (muss mit dbt_project.yml übereinstimmen)
+dbt_setup:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('PG_DWH_HOST', 'dwh-db') }}" 
+      port: "{{ env_var('PG_DWH_PORT', 5432) | int }}" 
+      user: "{{ env_var('PG_DWH_USER', 'dwh_user') }}"
+      password: "{{ env_var('PG_DWH_PASSWORD') }}" 
+      dbname: "{{ env_var('PG_DWH_DBNAME', 'dwh_dabi') }}"
+      schema: public 
+      threads: 4 
