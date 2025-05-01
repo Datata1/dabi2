@@ -3,7 +3,7 @@ name = "dscb420_projekt"
 version = "0.1.0"
 description = "Projektarbeit für DSCB420 - Datenanalyse und Business Intelligence 2 - SoSe2025"
 authors = [
-    { name = "Gruppe cool", email = "cool@h.ka.com" }, 
+    { name = "Gruppe cool", email = "cool@h-ka.com" }, 
 ]
 requires-python = ">=3.12"
 dependencies = [
