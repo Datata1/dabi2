@@ -1,1 +1,7 @@
+deliverables/*.aux
+deliverables/*.fdb_latexmk
+deliverables/*.fls
+deliverables/*.log
+deliverables/*.synctex.gz
+
 .venv
