@@ -1,4 +1,4 @@
--- models/marts/f_orders.sql
+-- models/marts/f_orders.sql (Historisch korrekt)
 {{
     config(
         materialized='table'
@@ -10,12 +10,12 @@ WITH orders AS (
 ),
 
 tips AS (
-    -- Stellt sicher, dass stg_tips nur einen Eintrag pro order_id hat (sollte der Fall sein)
     SELECT * FROM {{ ref('stg_tips') }}
 ),
 
-dim_users AS (
-    SELECT user_sk, user_id FROM {{ ref('dim_users') }}
+dim_users_hist AS ( -- Umbenannt zur Klarheit, referenziert die volle History-Tabelle
+    SELECT user_sk, user_id, valid_from, valid_to
+    FROM {{ ref('dim_users') }}
 ),
 
 dim_date AS (
@@ -23,23 +23,19 @@ dim_date AS (
 )
 
 SELECT
-    -- Primärschlüssel oder degenerierte Dimension der Bestellung
     o.order_id,
-
-    -- Foreign Keys zu den Dimensionen
+    -- Dieser User-SK gehört zur User-Version, die zum Zeitpunkt der Bestellung gültig war
     du.user_sk,
     dd.date_sk,
-
-    -- Measures / Fakten auf Bestell-Ebene
-    t.tip_given -- Trinkgeld gehört eindeutig zur Bestellung
-
-    -- Hier könnten später weitere Measures auf Bestell-Ebene hinzukommen,
-    -- z.B. SUM(preis), COUNT(artikel) etc., wenn man sie aus den Order Lines aggregiert.
+    t.tip_given
 
 FROM orders o
--- Join mit Tips, um die Trinkgeld-Info zu bekommen (sollte 1:1 sein)
 LEFT JOIN tips t ON o.order_id = t.order_id
--- Join mit Dimensionen, um die Surrogate Keys (SKs) zu erhalten
-LEFT JOIN dim_users du ON o.user_id = du.user_id
+-- Join mit der historischen User-Dimension
+LEFT JOIN dim_users_hist du
+    ON o.user_id = du.user_id
+    -- UND: Zeitstempel der Bestellung muss im Gültigkeitsbereich liegen
+    AND o.order_timestamp >= du.valid_from
+    AND o.order_timestamp < COALESCE(du.valid_to, '9999-12-31 23:59:59'::timestamp) -- COALESCE für aktuell gültige Einträge
+-- Join mit Datum bleibt gleich
 LEFT JOIN dim_date dd ON o.order_timestamp::date = dd.full_date
--- Kein GROUP BY nötig, wenn stg_orders und stg_tips eindeutig pro order_id sind.

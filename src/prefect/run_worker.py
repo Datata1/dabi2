@@ -11,13 +11,13 @@ from prefect.workers.process import ProcessWorker
 from prefect.filesystems import LocalFileSystem 
 from prefect.deployments.runner import RunnerDeployment
 
-from flows.data_pipeline import data_pipeline as target_flow
+from flows.data_pipeline import dwh_pipeline as target_flow
 
 # --- Konfiguration --- TODO: hole die konfigurationen aus .env oder utils.config.settings()
 WORK_POOL_NAME = "dabi2"
 DEPLOYMENT_NAME = "dabi2-test-deployment"
 FLOW_SCRIPT_PATH = Path("./flows/data_pipeline.py") 
-FLOW_FUNCTION_NAME = "data_pipeline" 
+FLOW_FUNCTION_NAME = "dwh_pipeline" 
 FLOW_ENTRYPOINT = f"./flows/data_pipeline.py:{FLOW_FUNCTION_NAME}" 
 APP_BASE_PATH = Path("/app/prefect/") 
 # INTERVAL_SECONDS = 180

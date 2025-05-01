@@ -13,10 +13,8 @@ DBT_PROFILE_NAME = "dbt_setup"        # Name des zu verwendenden Profils
 DBT_TARGET = "dev"            # Name des zu verwendenden Targets
 
 @task(name="Run dbt Command via Shell")
-def run_dbt_command_shell(
-    # Der Basis-dbt-Befehl als Liste, z.B. ["dbt", "run"] oder ["dbt", "debug"]
-    base_command: list[str],
-    # Optionale zusätzliche Argumente für den Befehl, z.B. ["--select", "staging.*"]
+def run_dbt_snapshot_shell(
+    base_command: list[str] = ["dbt", "snapshot"],
     extra_args: list[str] = None,
     dbt_project_dir: Path = DBT_PROJECT_DIR,
     dbt_profiles_dir: Path = DBT_PROFILES_DIR,

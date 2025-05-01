@@ -1,20 +1,29 @@
--- models/marts/dim_products.sql
+-- models/marts/dim_products.sql (Liest aus Snapshot)
 {{
     config(
         materialized='table'
     )
 }}
 
-SELECT DISTINCT -- Stellt sicher, dass jede Produkt-Kombination nur einmal vorkommt
+SELECT
+    -- Surrogate Key generieren (basiert auf dem Natural Key)
+    {{ dbt_utils.generate_surrogate_key(['product_id']) }} AS product_sk,
+
+    -- Spalten aus dem Snapshot übernehmen
     product_id,
     product_name,
     aisle_id,
     aisle,
     department_id,
     department,
-    -- Surrogate Key generieren
-    {{ dbt_utils.generate_surrogate_key(['product_id']) }} AS product_sk
-FROM {{ ref('stg_order_products') }}
--- Wichtig: Sicherstellen, dass die Quelle hier wirklich eindeutige Kombis pro product_id liefert
--- Ggf. GROUP BY product_id und Aggregation für Namen etc. verwenden, falls nötig.
--- Für diese Daten scheint DISTINCT zu reichen.
+
+    -- Gültigkeitsspalten aus dem Snapshot übernehmen und umbenennen
+    dbt_valid_from AS valid_from,
+    dbt_valid_to AS valid_to,
+
+    -- Aktuell-Flag ableiten
+    (dbt_valid_to IS NULL) AS is_current
+
+FROM {{ ref('scd_products') }} 
+
+WHERE dbt_valid_to IS NULL

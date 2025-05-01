@@ -107,6 +107,8 @@ services:
       - PG_DWH_USER=${DB_USER:-datata1}
       - PG_DWH_PASSWORD=${DB_PASSWORD:-devpassword}
       - PG_DWH_DBNAME=${DB_NAME:-dwh_dabi}
+      - DBT_PROJECT_DIR=/app/prefect/dbt_setup
+      - DBT_PROFILES_DIR=/app/prefect/dbt_setup
     depends_on:
       db:
         condition: service_healthy
