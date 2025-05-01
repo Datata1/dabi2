@@ -24,13 +24,14 @@
     }
 
     # prefect ui
-    route /prefect* { # Matcht /prefect und /prefect/...
+    route /prefect* { 
         reverse_proxy prefect:4200
     }
 
-    # Finaler Catch-all für das Frontend
-    # Dieser route-Block hat keinen Matcher, fängt also alles ab,
-    # was von den oberen Blöcken nicht abgefangen wurde.
+    handle /jupyter* {
+        reverse_proxy jupyter-lab:8888 
+    }
+
     route {
         reverse_proxy frontend:8050
     }

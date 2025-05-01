@@ -23,7 +23,7 @@ services:
 
   redis:
     image: redis:latest 
-    container_name: redis_cache
+    container_name: redis_cache_dabi2
     restart: unless-stopped
     volumes:
       - redis_data:/data 
@@ -74,7 +74,7 @@ services:
   #     - "8050:8050"
 
   prefect:
-    container_name: prefect_server
+    container_name: prefect_server_dabi2
     image: prefecthq/prefect:3-latest 
     command: prefect server start --host 0.0.0.0
     environment:
@@ -88,31 +88,30 @@ services:
     ports:
       - "4200:4200"
 
-  # prefect-worker:
-  #   container_name: prefect_worker
-  #   build:
-  #     context: . 
-  #     dockerfile: ./services/ml_service/Dockerfile 
-  #   volumes:
-  #     - ./services/ml_service:/app/ml_service 
-  #     - ./shared:/app/ml_service/shared
-  #   working_dir: /app/ml_service 
-  #   command: "uv run python run_worker.py"
-  #   environment:
-  #     - PREFECT_API_URL=http://prefect:4200/api
-  #     - DATABASE_URL_PREFECT=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${PREFECT_DB_NAME}
-  #     - PREFECT_WORKER_WEBSERVER_PORT=8001
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #     prefect:
-  #       condition: service_started
-  #   restart: unless-stopped
-  #   ports:
-  #     - "8001:8001"
+  prefect-worker:
+    container_name: prefect_worker_dabi2
+    build:
+      context: . 
+      dockerfile: ./src/prefect/Dockerfile 
+    volumes:
+      - ./src/prefect:/app/prefect 
+    working_dir: /app/prefect
+    command: "uv run python run_worker.py"
+    environment:
+      - PREFECT_API_URL=http://prefect:4200/api
+      - DATABASE_URL_PREFECT=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${PREFECT_DB_NAME}
+      - PREFECT_WORKER_WEBSERVER_PORT=8001
+    depends_on:
+      db:
+        condition: service_healthy
+      prefect:
+        condition: service_started
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
 
   db-explorer:
-    container_name: pgweb_explorer
+    container_name: pgweb_explorer_dabi2
     image: sosedoff/pgweb:latest
     command: pgweb --url=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?sslmode=disable --bind=0.0.0.0 --prefix=db-admin --skip-open
     environment:
@@ -128,8 +127,40 @@ services:
     ports:
       - "8081:8081" 
 
+  jupyter-lab:
+    build:
+      context: . 
+      dockerfile: Dockerfile 
+    container_name: jupyter_lab_dabi2
+    volumes:
+      - .:/app/
+    ports:
+      - "8888:8888" 
+    working_dir: /app
+    environment: 
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-datata1}
+      - DB_PASSWORD=${DB_PASSWORD:-devpassword}
+      - DB_NAME=${DB_NAME:-umwelt}
+      - PREFECT_API_URL=http://prefect:4200/api
+    restart: unless-stopped
+    depends_on:
+      db: 
+        condition: service_healthy
+      prefect: 
+        condition: service_started
+    command: > # Multi-line für Lesbarkeit
+      uv run jupyter lab
+      --ServerApp.base_url=/jupyter
+      --ServerApp.token='dabi2'
+      --ServerApp.ip='0.0.0.0'
+      --ServerApp.port=8888
+      --no-browser
+      --allow-root 
+      --NotebookApp.notebook_dir=/app/notebooks 
   caddy:
-    container_name: caddy_proxy
+    container_name: caddy_proxy_dabi2
     image: caddy:latest
     restart: unless-stopped
     ports:

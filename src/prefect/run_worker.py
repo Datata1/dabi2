@@ -11,19 +11,16 @@ from prefect.workers.process import ProcessWorker
 from prefect.filesystems import LocalFileSystem 
 from prefect.deployments.runner import RunnerDeployment
 
-from flows.data_ingestion import data_ingestion_flow as target_flow
+from flows.test import test_flow as target_flow
 
 # --- Konfiguration --- TODO: hole die konfigurationen aus .env oder utils.config.settings()
-WORK_POOL_NAME = "timeseries"
-DEPLOYMENT_NAME = "timeseries-data-ingestion"
-FLOW_SCRIPT_PATH = Path("./flows/data_ingestion.py") 
-FLOW_FUNCTION_NAME = "data_ingestion_flow" 
-FLOW_ENTRYPOINT = f"./flows/data_ingestion.py:{FLOW_FUNCTION_NAME}" 
-APP_BASE_PATH = Path("/app/ml_service/") 
-DEFAULT_BOX_ID = "5faeb5589b2df8001b980304"
-INITIAL_FETCH_DAYS = 7
-CHUNK_DAYS = 2
-INTERVAL_SECONDS = 180
+WORK_POOL_NAME = "dabi2"
+DEPLOYMENT_NAME = "dabi2-test-deployment"
+FLOW_SCRIPT_PATH = Path("./flows/test.py") 
+FLOW_FUNCTION_NAME = "test_flow" 
+FLOW_ENTRYPOINT = f"./flows/test.py:{FLOW_FUNCTION_NAME}" 
+APP_BASE_PATH = Path("/app/prefect/") 
+# INTERVAL_SECONDS = 180
 
 
 async def create_or_get_work_pool(client, name: str):
@@ -58,20 +55,20 @@ async def main():
         await create_or_get_work_pool(client, WORK_POOL_NAME)
 
         # --- Deployment erstellen/aktualisieren ---
-        deployment_params = {
-            "box_id": DEFAULT_BOX_ID,
-            "initial_fetch_days": INITIAL_FETCH_DAYS,
-            "fetch_chunk_days": CHUNK_DAYS,
-        }
-        schedule_payload = [
-            {
-                "schedule": {
-                    "interval": INTERVAL_SECONDS         
-                },
-            }
-        ]
-        deployment_tags = ["ingestion", "opensensemap", "scheduled"]
-        deployment_description = f"Holt alle {INTERVAL_SECONDS // 60} Minuten Daten von OpenSenseMap für Box {DEFAULT_BOX_ID}"
+        # deployment_params = {
+        #     "box_id": DEFAULT_BOX_ID,
+        #     "initial_fetch_days": INITIAL_FETCH_DAYS,
+        #     "fetch_chunk_days": CHUNK_DAYS,
+        # }
+        # schedule_payload = [
+        #     {
+        #         "schedule": {
+        #             "interval": INTERVAL_SECONDS         
+        #         },
+        #     }
+        # ]
+        deployment_tags = ["dabi2"]
+        deployment_description = f"test deployment"
 
         flow_id = await client.create_flow_from_name(FLOW_FUNCTION_NAME)
 
@@ -84,9 +81,6 @@ async def main():
                 "work_pool_name": WORK_POOL_NAME,
                 "entrypoint": FLOW_ENTRYPOINT,
                 "path": str(APP_BASE_PATH),  # reguetsts cant handle Path objects
-                "parameter_openapi_schema": deployment_params,
-                "parameters": deployment_params,
-                "schedules": schedule_payload,
                 "tags": deployment_tags,
                 "description": deployment_description,
             },
