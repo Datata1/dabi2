@@ -33,4 +33,9 @@ down:
 	sudo docker-compose down --volumes 
 	sudo rm -rf .venv
 
+sudo:
+	@echo ">>> Veränder Zugriffsrechte für volumes..."
+	sudo chown $(id -u):$(id -g) ~/Documents/dabi2/src/prefect/dbt_setup/dev.duckdb
+	sudo chown $(id -u):$(id -g) ~/Documents/dabi2/.venv
+
 

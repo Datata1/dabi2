@@ -1,13 +1,16 @@
-# flows/dwh_pipeline_runner.py (oder ersetze data_pipeline.py)
-from prefect import flow
+# flows/data_pipeline.py (oder ersetze data_pipeline.py)
+from prefect import flow, get_run_logger
 from tasks.load_raw_data import load_raw_data
 from tasks.run_dbt_runner import run_dbt_command_runner
+
 
 @flow(name="DWH Pipeline (PrefectDbtRunner)")
 def dwh_pipeline():
     """
     Verwendet PrefectDbtRunner, um dbt Befehle in korrekter Reihenfolge auszuführen.
     """
+    logger = get_run_logger()
+
     # 1. Lade Rohdaten
     raw_data_loaded = load_raw_data()
 
@@ -38,4 +41,4 @@ def dwh_pipeline():
         dbt_args=["run", "--select", "marts.*", "intermediate.*"],
         upstream_result=snapshot_taken
     )
-    return marts_built
+    return marts_built 

@@ -1,4 +1,4 @@
--- models/marts/dim_date.sql
+-- models/marts/dim_date.sql (Angepasst für DuckDB)
 {{
     config(
         materialized='table'
@@ -44,52 +44,35 @@
         -- Schritt 3: Extrahiere Datumsattribute und erstelle den Surrogate Key
         SELECT
             d.date_day AS full_date,
-            CAST(to_char(d.date_day, 'YYYYMMDD') AS INTEGER) AS date_sk,
+            -- Ersetze to_char durch strftime für DuckDB
+            CAST(strftime(d.date_day, '%Y%m%d') AS INTEGER) AS date_sk,
             EXTRACT(YEAR FROM d.date_day) AS year,
             EXTRACT(MONTH FROM d.date_day) AS month,
             EXTRACT(DAY FROM d.date_day) AS day,
-            EXTRACT(dow FROM d.date_day) AS day_of_week,
-            EXTRACT(doy FROM d.date_day) AS day_of_year,
-            EXTRACT(week FROM d.date_day) AS week_of_year,
+            -- Ersetze dow durch dayofweek für DuckDB (Sonntag=0)
+            EXTRACT(dayofweek FROM d.date_day) AS day_of_week,
+            -- Ersetze doy durch dayofyear für DuckDB
+            EXTRACT(dayofyear FROM d.date_day) AS day_of_year,
+            -- Ersetze week durch weekofyear für DuckDB
+            EXTRACT(weekofyear FROM d.date_day) AS week_of_year,
             EXTRACT(QUARTER FROM d.date_day) AS quarter,
             CASE
-                WHEN EXTRACT(dow FROM d.date_day) IN (0, 6) THEN true
+                -- Verwende dayofweek für DuckDB (Sonntag=0, Samstag=6)
+                WHEN EXTRACT(dayofweek FROM d.date_day) IN (0, 6) THEN true
                 ELSE false
             END AS is_weekend
         FROM date_spine d
 
     {% else %}
-        -- Fallback, wenn Start- oder Enddatum NULL ist
+        -- Fallback, wenn Start- oder Enddatum NULL ist (unverändert)
         {{ log("WARNUNG: Start- oder Enddatum ist NULL. dim_date wird leer sein.", info=True) }}
-        SELECT
-            CAST(NULL AS DATE) AS full_date,
-            CAST(NULL AS INTEGER) AS date_sk,
-            CAST(NULL AS INTEGER) AS year,
-            CAST(NULL AS INTEGER) AS month,
-            CAST(NULL AS INTEGER) AS day,
-            CAST(NULL AS INTEGER) AS day_of_week,
-            CAST(NULL AS INTEGER) AS day_of_year,
-            CAST(NULL AS INTEGER) AS week_of_year,
-            CAST(NULL AS INTEGER) AS quarter,
-            CAST(NULL AS BOOLEAN) AS is_weekend
-        LIMIT 0 -- Erzeugt eine leere Tabelle mit den richtigen Spalten
+        SELECT CAST(NULL AS DATE) AS full_date, CAST(NULL AS INTEGER) AS date_sk, CAST(NULL AS INTEGER) AS year, CAST(NULL AS INTEGER) AS month, CAST(NULL AS INTEGER) AS day, CAST(NULL AS INTEGER) AS day_of_week, CAST(NULL AS INTEGER) AS day_of_year, CAST(NULL AS INTEGER) AS week_of_year, CAST(NULL AS INTEGER) AS quarter, CAST(NULL AS BOOLEAN) AS is_weekend LIMIT 0
 
     {% endif %}
 
 {% else %}
-    -- Fallback, wenn run_query fehlschlägt oder keine Zeilen zurückgibt
+    -- Fallback, wenn run_query fehlschlägt (unverändert)
     {{ log("FEHLER: run_query für Datumsbereich hat keine Ergebnisse geliefert. dim_date wird leer sein.", info=True) }}
-    SELECT
-        CAST(NULL AS DATE) AS full_date,
-        CAST(NULL AS INTEGER) AS date_sk,
-        CAST(NULL AS INTEGER) AS year,
-        CAST(NULL AS INTEGER) AS month,
-        CAST(NULL AS INTEGER) AS day,
-        CAST(NULL AS INTEGER) AS day_of_week,
-        CAST(NULL AS INTEGER) AS day_of_year,
-        CAST(NULL AS INTEGER) AS week_of_year,
-        CAST(NULL AS INTEGER) AS quarter,
-        CAST(NULL AS BOOLEAN) AS is_weekend
-    LIMIT 0 -- Erzeugt eine leere Tabelle mit den richtigen Spalten
+    SELECT CAST(NULL AS DATE) AS full_date, CAST(NULL AS INTEGER) AS date_sk, CAST(NULL AS INTEGER) AS year, CAST(NULL AS INTEGER) AS month, CAST(NULL AS INTEGER) AS day, CAST(NULL AS INTEGER) AS day_of_week, CAST(NULL AS INTEGER) AS day_of_year, CAST(NULL AS INTEGER) AS week_of_year, CAST(NULL AS INTEGER) AS quarter, CAST(NULL AS BOOLEAN) AS is_weekend LIMIT 0
 
 {% endif %}

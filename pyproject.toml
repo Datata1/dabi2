@@ -33,6 +33,8 @@ dependencies = [
     "fastparquet",
     "PyYAML",
     "prefect-dbt>=0.7.0rc1",
+    "minio>=7.2.15",
+    "confluent-kafka>=2.10.0",
 ]
 
 [project.optional-dependencies]

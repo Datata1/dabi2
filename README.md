@@ -92,3 +92,9 @@ make
 ```sh
 make down
 ```
+
+#### set up debezium connectors
+```sh
+curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" \
+localhost:8083/connectors/ -d @debezium-pg-connector.json
+```

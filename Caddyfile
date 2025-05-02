@@ -2,26 +2,6 @@
     
     encode gzip
 
-    log {
-        output discard 
-    }
-
-    route /api/* {
-        reverse_proxy backend:8000
-    }
-
-    route /docs* {
-        reverse_proxy backend:8000
-    }
-
-    route /openapi.json* {
-        reverse_proxy backend:8000
-    }
-
-    route /favicon.ico* {
-        reverse_proxy backend:8000
-    }
-
     # db explorer
     route /db-admin* { 
         reverse_proxy db-explorer:8081

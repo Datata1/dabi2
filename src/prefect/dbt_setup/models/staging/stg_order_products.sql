@@ -6,5 +6,6 @@ SELECT
     aisle_id::INTEGER AS aisle_id,
     aisle,
     department_id::INTEGER AS department_id,
-    department
+    department,
+    CAST('1900-01-01 00:00:00' AS timestamp) AS updated_at
 FROM {{ source('raw_data', 'raw_order_products') }}

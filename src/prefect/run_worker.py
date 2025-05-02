@@ -3,6 +3,7 @@ import sys
 import requests
 import uuid
 from pathlib import Path
+import traceback
 
 from prefect import get_client, deploy
 from prefect.server.schemas.actions import WorkPoolCreate
@@ -12,14 +13,26 @@ from prefect.filesystems import LocalFileSystem
 from prefect.deployments.runner import RunnerDeployment
 
 from flows.data_pipeline import dwh_pipeline as target_flow
+from flows.initial_oltp_load_flow import initial_oltp_load_flow 
 
 # --- Konfiguration --- TODO: hole die konfigurationen aus .env oder utils.config.settings()
 WORK_POOL_NAME = "dabi2"
-DEPLOYMENT_NAME = "dabi2-test-deployment"
-FLOW_SCRIPT_PATH = Path("./flows/data_pipeline.py") 
-FLOW_FUNCTION_NAME = "dwh_pipeline" 
-FLOW_ENTRYPOINT = f"./flows/data_pipeline.py:{FLOW_FUNCTION_NAME}" 
-APP_BASE_PATH = Path("/app/prefect/") 
+APP_BASE_PATH = Path("/app/prefect/")
+
+# --- Konfiguration für DWH Flow ---
+DWH_DEPLOYMENT_NAME = "dwh-pipeline"
+DWH_FLOW_SCRIPT_PATH = Path("./flows/data_pipeline.py") 
+DWH_FLOW_FUNCTION_NAME = target_flow.__name__ 
+DWH_FLOW_ENTRYPOINT = f"./flows/data_pipeline.py:{DWH_FLOW_FUNCTION_NAME}" 
+DWH_TAGS = ["dwh"]
+DWH_DESCRIPTION = "DWH Pipeline for DABI2"
+
+# --- Konfiguration für Initial OLTP Load Flow ---
+OLTP_DEPLOYMENT_NAME = "oltp-initial-load" 
+OLTP_FLOW_FUNCTION_NAME = initial_oltp_load_flow.__name__ 
+OLTP_FLOW_ENTRYPOINT = f"./flows.initial_oltp_load_flow:{OLTP_FLOW_FUNCTION_NAME}" 
+OLTP_TAGS = ["oltp", "initial-load"]
+OLTP_DESCRIPTION = "Initial load of static files into OLTP database"
 # INTERVAL_SECONDS = 180
 
 
@@ -50,54 +63,107 @@ async def create_or_get_work_pool(client, name: str):
 
 async def main():
     """Hauptfunktion zum Einrichten und Starten des Prefect Workers via API."""
+    oltp_deployment_id_to_trigger = None
+
     async with get_client() as client:
         # --- Work Pool sicherstellen ---
         await create_or_get_work_pool(client, WORK_POOL_NAME)
 
-        # --- Deployment erstellen/aktualisieren ---
-        # deployment_params = {
-        #     "box_id": DEFAULT_BOX_ID,
-        #     "initial_fetch_days": INITIAL_FETCH_DAYS,
-        #     "fetch_chunk_days": CHUNK_DAYS,
-        # }
-        # schedule_payload = [
-        #     {
-        #         "schedule": {
-        #             "interval": INTERVAL_SECONDS         
-        #         },
-        #     }
-        # ]
-        deployment_tags = ["dabi2", "data-ingestion", "initial_dwh_setup"]
-        deployment_description = f"data ingestion pipeline for dabi2"
+        # --- Deployment 1: DWH Pipeline ---
+        print(f"\n--- Deploying DWH Flow: {DWH_DEPLOYMENT_NAME} ---")
+        try:
+            print(f"Ermittle Flow ID für Funktion: {DWH_FLOW_FUNCTION_NAME}")
+            dwh_flow_id = await client.create_flow_from_name(DWH_FLOW_FUNCTION_NAME)
+            print(f"Flow ID für DWH: {dwh_flow_id}")
 
-        flow_id = await client.create_flow_from_name(FLOW_FUNCTION_NAME)
+            print(f"Sende POST request für DWH Deployment...")
+            dwh_deployment_response = requests.post(
+                f"http://prefect:4200/api/deployments", # Stelle sicher, dass API URL stimmt
+                json={
+                    "name": DWH_DEPLOYMENT_NAME,
+                    "flow_id": str(dwh_flow_id),
+                    "work_pool_name": WORK_POOL_NAME,
+                    "entrypoint": DWH_FLOW_ENTRYPOINT,
+                    "enforce_parameter_schema": False,
+                    "path": str(APP_BASE_PATH),
+                    "tags": DWH_TAGS,
+                    "description": DWH_DESCRIPTION,
+                },
+                headers={"Content-Type": "application/json"},
+                timeout=30 # Timeout hinzufügen
+            )
+            dwh_deployment_response.raise_for_status() 
+            dwh_deployment_data = dwh_deployment_response.json()
+            dwh_deployment_id = dwh_deployment_data.get('id')
+            if dwh_deployment_id:
+                 print(f"DWH Deployment '{DWH_DEPLOYMENT_NAME}' (ID: {dwh_deployment_id}) erfolgreich erstellt/aktualisiert.")
+            else:
+                 logger.warning(f"DWH Deployment erstellt, aber keine ID in Antwort gefunden: {dwh_deployment_data}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"FEHLER bei OLTP Deployment HTTP-Anfrage: {e}", file=sys.stderr)
+            if hasattr(e, 'response') and e.response is not None: print(f"Response Body: {e.response.text}", file=sys.stderr)
+            # sys.exit(1) # Ggf. abbrechen
+        except Exception as e:
+            logger.error(f"FEHLER beim Erstellen/Verarbeiten des OLTP Deployments: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            # sys.exit(1) # Ggf. abbrechen
+        
+        # --- Deployment 2: Initial OLTP Load ---
+        print(f"\n--- Deploying OLTP Initial Load Flow: {OLTP_DEPLOYMENT_NAME} ---")
+        try:
+            print(f"Ermittle Flow ID für Funktion: {OLTP_FLOW_FUNCTION_NAME}")
+            oltp_flow_id = await client.create_flow_from_name(OLTP_FLOW_FUNCTION_NAME)
+            print(f"Flow ID for OLTP Load: {oltp_flow_id}")
 
-        # --- Deployment erstellen ---
-        deployment = requests.post(
-            f"http://prefect:4200/api/deployments",
-            json={
-                "name": DEPLOYMENT_NAME,
-                "flow_id": str(flow_id),  # requests cant handle uuid 
-                "work_pool_name": WORK_POOL_NAME,
-                "entrypoint": FLOW_ENTRYPOINT,
-                "enforce_parameter_schema": False,
-                "path": str(APP_BASE_PATH),  # reguetsts cant handle Path objects
-                "tags": deployment_tags,
-                "description": deployment_description,
-            },
-            headers={"Content-Type": "application/json"},
-        )
+            print(f"Sende POST request für OLTP Deployment...")
+            oltp_deployment_response = requests.post(
+                f"http://prefect:4200/api/deployments",
+                json={
+                    "name": OLTP_DEPLOYMENT_NAME,
+                    "flow_id": str(oltp_flow_id),
+                    "work_pool_name": WORK_POOL_NAME,
+                    "entrypoint": OLTP_FLOW_ENTRYPOINT,
+                    "enforce_parameter_schema": False,
+                    "path": str(APP_BASE_PATH),
+                    "tags": OLTP_TAGS,
+                    "description": OLTP_DESCRIPTION,
+                },
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            oltp_deployment_response.raise_for_status()
+            oltp_deployment_data = oltp_deployment_response.json()
+            # Speichere die ID dieses Deployments für den Trigger
+            oltp_deployment_id_to_trigger = oltp_deployment_data.get('id')
+            if oltp_deployment_id_to_trigger:
+                 print(f"OLTP Deployment '{OLTP_DEPLOYMENT_NAME}' (ID: {oltp_deployment_id_to_trigger}) erfolgreich erstellt/aktualisiert.")
+            else:
+                 logger.error(f"FEHLER: OLTP Deployment erstellt, aber keine ID in Antwort gefunden: {oltp_deployment_data}")
+                 # Hier ggf. abbrechen, da der Trigger fehlschlagen wird
+                 # sys.exit(1)
 
-        deployment = deployment.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"FEHLER bei DWH Deployment HTTP-Anfrage: {e}", file=sys.stderr)
+            if hasattr(e, 'response') and e.response is not None: print(f"Response Body: {e.response.text}", file=sys.stderr)
+        except Exception as e:
+            logger.error(f"FEHLER beim Erstellen/Verarbeiten des DWH Deployments: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr) # Gibt mehr Details aus
 
-        # --- start flow run ---
-        await client.create_flow_run_from_deployment(
-            deployment_id=deployment.get("id"),
-            tags=deployment_tags,
-            name="initial_loader",
-        )
-
-    print(f"Deployment '{DEPLOYMENT_NAME}' (ID: {deployment}) erfolgreich erstellt.")
+        # --- Initialen Flow Run für OLTP Load triggern ---
+        print(f"\n--- Triggering Initial OLTP Load Flow Run ---")
+        if oltp_deployment_id_to_trigger: 
+            try:
+                print(f"Triggere Flow Run für OLTP Deployment ID: {oltp_deployment_id_to_trigger}...")
+                flow_run = await client.create_flow_run_from_deployment(
+                    deployment_id=oltp_deployment_id_to_trigger, 
+                    name="initial-oltp-load-run", 
+                )
+                print(f"Flow Run für OLTP Load (ID: {flow_run.id}) erfolgreich getriggert.")
+            except Exception as e_run:
+                logger.error(f"FEHLER beim Triggern des OLTP Load Flow Runs für Deployment {oltp_deployment_id_to_trigger}: {e_run}", file=sys.stderr)
+                traceback.print_exc(file=sys.stderr)
+        else:
+            logger.error("FEHLER: Kann OLTP Load Flow Run nicht triggern, da Deployment-ID fehlt oder Deployment fehlgeschlagen ist.")
 
     # --- Worker starten ---
     print(f"Starte Worker für Pool '{WORK_POOL_NAME}'...")

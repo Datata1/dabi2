@@ -8,3 +8,5 @@ deliverables/*.synctex.gz
 .ipynb_checkpoints
 __pycache__
 *.pyc
+
+dev.duckdb
