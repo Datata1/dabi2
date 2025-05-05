@@ -35,6 +35,7 @@ dependencies = [
     "prefect-dbt>=0.7.0rc1",
     "minio>=7.2.15",
     "confluent-kafka>=2.10.0",
+    "prefect-aws>=0.5.10",
 ]
 
 [project.optional-dependencies]

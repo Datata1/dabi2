@@ -1,6 +1,16 @@
+-- models/staging/stg_orders.sql
+-- Staging-Modell für Order-CDC-Events
+
 SELECT
-    user_id::BIGINT AS user_id, -- Beispiel Typkonvertierung
-    order_id::BIGINT AS order_id,
-    CAST(order_date AS TIMESTAMP) AS order_timestamp -- Sicherstellen, dass es ein Zeitstempel ist
-    -- Füge weitere Spalten hinzu, falls vorhanden/nötig
-FROM {{ source('raw_data', 'raw_orders') }}
+    -- Spalten aus dem CDC-Payload (Namen wie in der DB / Parquet-Datei)
+    order_id::BIGINT,
+    user_id::BIGINT,
+    CAST(order_date AS TIMESTAMP) AS order_timestamp, -- order_date ist der ursprüngliche Spaltenname
+    tip_given::BOOLEAN AS tip_given, -- Tip-Info ist hier
+
+    -- CDC Metadaten übernehmen und ggf. umbenennen
+    "__op" AS op_type, -- Zugriff auf Spalten mit Sonderzeichen in ""
+    "__source_ts_ms" AS source_timestamp_ms,
+    load_ts AS staging_load_timestamp -- Vom Prefect Task hinzugefügt
+
+FROM {{ source('cdc_staging', 'orders') }} 

@@ -1,19 +1,45 @@
--- models/marts/dim_users.sql
+-- models/marts/dim_users.sql (Angepasst für CDC und Inkrementalität)
 {{
     config(
-        materialized='table'
+        materialized='incremental',
+        unique_key='user_id'
     )
 }}
 
-{% set initial_valid_from = '1900-01-01 00:00:00' %} 
-{{ log("Using fixed initial valid_from for dim_users: " ~ initial_valid_from, info=True) }}
+-- Optional: CTE, um den neuesten Stand pro User im Batch zu bekommen
+-- (falls kein separates Intermediate-Modell verwendet wird)
+WITH latest_user_updates AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY user_id
+            ORDER BY source_timestamp_ms DESC, staging_load_timestamp DESC
+        ) as rn
+    FROM {{ ref('stg_users') }} -- Quelle ist das neue Staging-Modell
+
+    {% if is_incremental() %}
+      -- Verarbeite nur Staging-Daten, die neuer sind als die letzte Ladung in DIESE Tabelle
+      -- Wichtig: Benötigt staging_load_timestamp im SELECT unten
+      WHERE staging_load_timestamp > (SELECT max(staging_load_timestamp) FROM {{ this }})
+    {% endif %}
+)
 
 SELECT
-    {{ dbt_utils.generate_surrogate_key(['user_id']) }} AS user_sk,
-    user_id,
-    -- SCD Typ 2 Spalten für den initialen Load
-    CAST('{{ initial_valid_from }}' AS timestamp) AS valid_from,
-    CAST(NULL AS timestamp) AS valid_to,
-    TRUE AS is_current
-FROM {{ ref('stg_orders') }}
-GROUP BY user_id -- Nur eindeutige User
+    -- user_id ist der unique_key
+    lu.user_id,
+    -- Surrogate Key kann hier oder später generiert werden, falls benötigt
+    -- {{ dbt_utils.generate_surrogate_key(['lu.user_id']) }} AS user_sk,
+
+    -- Logisches Delete-Flag basierend auf dem letzten op_type im Batch
+    CASE WHEN lu.op_type = 'd' THEN FALSE ELSE TRUE END AS is_active,
+
+    -- Metadaten für Nachverfolgung und Snapshots
+    lu.source_timestamp_ms,
+    lu.staging_load_timestamp
+
+FROM latest_user_updates lu
+WHERE lu.rn = 1 -- Nur den aktuellsten Stand aus dem Batch verarbeiten
+
+-- Die MERGE-Logik von dbt (basierend auf unique_key) wird:
+-- 1. Neue user_id's einfügen (mit is_active=true).
+-- 2. Bestehende user_id's aktualisieren (setzt is_active auf true/false, aktualisiert Zeitstempel).

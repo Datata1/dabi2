@@ -80,20 +80,12 @@ def get_kafka_consumer():
 
 def write_batches_to_minio(client: Minio):
     global message_buffer, last_write_time
-    # Logger statt logger.info verwenden (optional aber empfohlen)
-    try:
-        # Versuche, Prefect Logger zu bekommen, falls verfügbar
-        logger = get_run_logger()
-    except:
-        # Fallback zu standard Python logging oder logger.info
-        import logging
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', stream=sys.stdout)
-        logger = logging.getLogger(__name__)
+    # Verwende das konfigurierte Logging
+    logger.info(f"({datetime.now()}) Checking if batches need to be written...")
+    processed_topics_in_batch = [] # Track successfully processed topics for buffer clearing
 
-    logger.info("Checking if batches need to be written...") # logger.info -> logger.info
-    processed_topics_in_batch = [] # Verfolgen, welche Topics erfolgreich verarbeitet wurden
-
-    for topic, payloads in list(message_buffer.items()): # Variable umbenannt für Klarheit
+    # Iteriere über Kopie der Items, um Dictionary während Iteration zu ändern
+    for topic, payloads in list(message_buffer.items()):
         if not payloads:
             continue
 
@@ -102,69 +94,113 @@ def write_batches_to_minio(client: Minio):
 
         try:
             records_to_write = []
-            for payload in payloads: # Iteriere direkt durch die payload-Dictionaries
-                if payload is None: # Sicherheitscheck
+            for payload in payloads: # payload ist z.B.: {'aisle_id': ..., '__op': 'c', ...}
+                if payload is None:
                     continue
 
-                # payload enthält bereits die Tabellendaten (z.B. aisle_id, aisle)
-                # Erstelle eine Kopie, um Metadaten hinzuzufügen
+                # Kopiere das Payload, das Tabellendaten und __op, __ts_ms enthält
                 record_data = payload.copy()
 
-                # Entferne interne Debezium-Felder wie '__deleted', falls nicht benötigt
+                # --- CORE FIX: Extrahiere __op und __ts_ms, weise _op, _ts_ms zu ---
+                actual_op = record_data.get('__op')
+                actual_ts_ms = record_data.get('__ts_ms')
+
+                # Weise den Zielspalten zu (z.B. mit einfachem Unterstrich)
+                record_data['_op'] = actual_op
+                record_data['_ts_ms'] = actual_ts_ms
+                # --------------------------------------------------------------------
+
+                # Entferne die ursprünglichen Felder mit doppeltem Unterstrich
+                record_data.pop('__op', None)
+                record_data.pop('__ts_ms', None)
+
+                # Entferne __deleted, falls vorhanden und nicht benötigt
                 record_data.pop('__deleted', None)
 
-                # Füge unsere gewünschten Metadaten hinzu
-                # op und ts_ms sind in DIESER Payload-Struktur nicht enthalten,
-                # sie waren Teil der äußeren Struktur VOR dem unwrap.
-                # Wir setzen sie hier auf None oder holen sie ggf. aus der originalen 'data'-Variable,
-                # falls wir diese statt nur der Payload speichern würden. Lassen wir sie erstmal weg oder None.
-                record_data['_op'] = payload.get('op', None) # 'op' ist wahrscheinlich nicht in dieser Payload
-                record_data['_ts_ms'] = payload.get('ts_ms', None) # 'ts_ms' ist wahrscheinlich nicht in dieser Payload
+                # Füge andere Metadaten hinzu
                 record_data['_kafka_topic'] = topic
-                record_data['_processing_ts'] = datetime.now().isoformat() # Zeitstempel der Verarbeitung hinzufügen
+                record_data['_processing_ts'] = datetime.now().isoformat()
+
+                # Füge Partitionsspalten hinzu
+                now_dt = datetime.now()
+                record_data['year'] = now_dt.year
+                record_data['month'] = f"{now_dt.month:02d}"
+                record_data['day'] = f"{now_dt.day:02d}"
 
                 records_to_write.append(record_data)
 
             if not records_to_write:
                  logger.warning(f"No valid records derived for table '{table_name}' in this batch.")
-                 processed_topics_in_batch.append(topic) # Als verarbeitet markieren (um Buffer zu leeren)
+                 processed_topics_in_batch.append(topic) # Als verarbeitet markieren
                  continue
 
-            # DataFrame aus den verarbeiteten Dictionaries erstellen
-            # Enthält jetzt Tabellenspalten + _kafka_topic + _processing_ts (+ ggf. _op/_ts_ms als None)
+            # Erstelle DataFrame
             df = pd.DataFrame(records_to_write)
 
-            # --- Rest der Funktion bleibt gleich: Pfad erstellen, Parquet schreiben, Upload ---
-            now = datetime.now()
-            file_timestamp = now.strftime('%Y%m%d_%H%M%S_%f')
-            # Dateiname etwas eindeutiger machen
-            object_name = f"cdc_events/{table_name}/year={now.year}/month={now.month:02d}/day={now.day:02d}/{table_name}_{file_timestamp}.parquet"
+            # --- Wichtig: Typkonvertierung für korrekte Parquet/DB-Typen ---
+            if '_ts_ms' in df.columns:
+                 # Konvertiere zu numerisch, erzwinge Fehler zu NaT/NaN, dann zu Int64 (Nullable Integer)
+                 df['_ts_ms'] = pd.to_numeric(df['_ts_ms'], errors='coerce').astype(pd.Int64Dtype())
+            if '_op' in df.columns:
+                 df['_op'] = df['_op'].astype(str) # 'c', 'u', 'd', 'r' als String
+
+            # Konvertiere Partitionsspalten
+            if 'year' in df.columns: df['year'] = df['year'].astype(int)
+            if 'month' in df.columns: df['month'] = df['month'].astype(str)
+            if 'day' in df.columns: df['day'] = df['day'].astype(str)
+            # Fügen Sie hier bei Bedarf weitere Typkonvertierungen für Ihre Tabellenspalten hinzu
+
+            # --- Pfad erstellen und Parquet schreiben ---
+            last_record = records_to_write[-1]
+            year_part = last_record.get('year', datetime.now().year)
+            month_part = last_record.get('month', f"{datetime.now().month:02d}")
+            day_part = last_record.get('day', f"{datetime.now().day:02d}")
+            file_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+            object_name = f"cdc_events/{table_name}/year={year_part}/month={month_part}/day={day_part}/{table_name}_{file_timestamp}.parquet"
 
             logger.info(f"Writing DataFrame ({len(df)} rows, Columns: {list(df.columns)}) to MinIO: {MINIO_BUCKET}/{object_name}")
 
             out_buffer = BytesIO()
-            df.to_parquet(out_buffer, index=False, engine='pyarrow', compression='snappy')
+            try:
+                # Schreibe DataFrame in den Buffer
+                df.to_parquet(out_buffer, index=False, engine='pyarrow', compression='snappy')
+            except Exception as e_parquet:
+                logger.error(f"FEHLER beim Erstellen der Parquet-Datei für {topic}: {e_parquet}", exc_info=True)
+                continue # Überspringe Upload für diesen Batch
+
             out_buffer.seek(0)
 
-            client.put_object(
-                MINIO_BUCKET,
-                object_name,
-                data=out_buffer,
-                length=out_buffer.getbuffer().nbytes,
-                content_type='application/parquet' # Korrekter Content Type
-            )
-            logger.info(f"Upload for {object_name} successful.")
-            processed_topics_in_batch.append(topic) # Als erfolgreich verarbeitet markieren
+            # --- Upload nach MinIO ---
+            try:
+                client.put_object(
+                    MINIO_BUCKET,
+                    object_name,
+                    data=out_buffer,
+                    length=out_buffer.getbuffer().nbytes,
+                    content_type='application/parquet'
+                )
+                logger.info(f"Upload for {object_name} successful.")
+                # Markiere Topic als erfolgreich verarbeitet
+                processed_topics_in_batch.append(topic)
+            except S3Error as e_s3:
+                logger.error(f"FEHLER beim Upload nach MinIO für {topic} ({object_name}): {e_s3}", exc_info=True)
+                # Nicht als verarbeitet markieren, wird beim nächsten Mal erneut versucht
 
-        except Exception as e:
-            logger.error(f"FEHLER beim Verarbeiten/Schreiben des Batches für {topic}: {e}", exc_info=True)
-            # Hier entscheiden: Verarbeitung für dieses Topic abbrechen?
+        except Exception as e_batch:
+            logger.error(f"FEHLER beim Verarbeiten des Batches für {topic}: {e_batch}", exc_info=True)
 
     # --- Buffer nur für erfolgreich verarbeitete Topics leeren ---
-    for topic in processed_topics_in_batch:
-        if topic in message_buffer:
-            logger.debug(f"Clearing buffer for topic {topic}") # Debug Level
-            message_buffer[topic] = []
+    if processed_topics_in_batch:
+        logger.info(f"Clearing buffer for successfully processed topics: {processed_topics_in_batch}")
+        for topic in processed_topics_in_batch:
+            if topic in message_buffer:
+                # Sicherstellen, dass wir keine Race Condition haben (unwahrscheinlich hier)
+                try:
+                    del message_buffer[topic] # Entferne den Eintrag sicher
+                except KeyError:
+                    pass # Topic wurde möglicherweise schon entfernt
+    else:
+         logger.debug("No topics were successfully processed in this write cycle.") # Debug Level
 
     last_write_time = time.time() 
 

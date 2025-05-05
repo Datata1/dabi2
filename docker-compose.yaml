@@ -60,6 +60,8 @@ services:
       - PG_DWH_DBNAME=${DB_NAME:-dwh_dabi}
       - DBT_PROJECT_DIR=/app/prefect/dbt_setup
       - DBT_PROFILES_DIR=/app/prefect/dbt_setup
+      - MINIO_ROOT_PASSWORD=minio_secret_password
+      - MINIO_ROOT_USER=minioadmin
     depends_on:
       prefect:
         condition: service_started
@@ -142,7 +144,7 @@ services:
       CONFIG_STORAGE_TOPIC: dabi2_connect_configs
       OFFSET_STORAGE_TOPIC: dabi2_connect_offsets
       STATUS_STORAGE_TOPIC: dabi2_connect_status
-      KAFKA_HEAP_OPTS: "-Xms512M -Xmx512M"
+      KAFKA_HEAP_OPTS: "-Xmx4g -Xms1g"
       # Umgebungsvariablen für die OLTP DB Verbindung (für Debezium)
       # Debezium verwendet diese oft, um nicht alles im Connector-JSON zu haben
       CONNECT_DATABASE_HOSTNAME: ${DB_HOST:-oltp-db}
@@ -161,20 +163,16 @@ services:
     container_name: debezium_provisioner_dabi2
     depends_on:
       kafka-connect:
-        condition: service_healthy # Wartet bis Kafka Connect API läuft
+        condition: service_healthy 
     volumes:
-      # Mountet die JSON-Konfigurationsdatei (nur lesend)
       - ./config/kafka-connect/debezium-pg-connector.json:/config/debezium-pg-connector.json:ro
-      # Mountet das Shell-Skript (nur lesend)
       - ./config/kafka-connect/provision_debezium.sh:/config/provision_debezium.sh:ro
-    # Führt das Skript aus, nachdem es ausführbar gemacht wurde
     command: ["/bin/sh", "/config/provision_debezium.sh"]
   
   akhq:
-    image: tchiotludo/akhq:latest # Offizielles AKHQ Image
+    image: tchiotludo/akhq:latest 
     container_name: akhq_ui_dabi2
     environment:
-      # Konfiguration für AKHQ, um deine Services zu finden
       AKHQ_CONFIGURATION: |
         akhq:
           connections:
