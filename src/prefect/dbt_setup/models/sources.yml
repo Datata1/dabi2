@@ -1,0 +1,33 @@
+# models/sources.yml (oder models/staging/sources.yml)
+
+version: 2
+
+sources:
+  - name: cdc_staging  # Der Name der Quelle, den Sie in {{ source(...) }} verwenden
+    description: "Rohe CDC Events, die vom Prefect Flow aus MinIO in DuckDB geladen wurden."
+    
+    # Optional: Datenbankname, falls in profiles.yml nicht als Default gesetzt
+    # database: main # DuckDB hat standardmäßig eine 'main'-Datenbank
+
+    # Das Schema in DuckDB, in das Prefect schreibt
+    schema: main # Standard-Schema in DuckDB ist oft 'main'
+
+    # Hier deklarieren wir jede Tabelle, die Prefect erstellt
+    tables:
+      - name: aisles  # Logischer Name für DBT -> {{ source('cdc_staging', 'aisles') }}
+        identifier: stg_raw_aisles # Tatsächlicher Tabellenname in DuckDB
+
+      - name: departments
+        identifier: stg_raw_departments
+
+      - name: products
+        identifier: stg_raw_products
+
+      - name: users
+        identifier: stg_raw_users
+
+      - name: orders
+        identifier: stg_raw_orders
+
+      - name: order_products # Name aus der DB/Kafka-Topic
+        identifier: stg_raw_order_products # Name der Tabelle in DuckDB
