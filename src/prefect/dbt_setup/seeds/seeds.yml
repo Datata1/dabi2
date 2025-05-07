@@ -1,0 +1,31 @@
+# seeds/seeds.yml
+version: 2
+
+seeds:
+  - name: historical_dim_products_source 
+    description: "Initialer Seed für die Produktdimension mit historischem dbt_valid_from."
+    columns:
+      - name: product_id
+        data_type: BIGINT 
+      - name: product_name
+        data_type: VARCHAR
+      - name: aisle_id
+        data_type: BIGINT
+      - name: aisle_name
+        data_type: VARCHAR
+      - name: department_id
+        data_type: BIGINT
+      - name: department_name
+        data_type: VARCHAR
+      - name: historical_effective_from
+        data_type: TIMESTAMP WITH TIME ZONE 
+
+
+  - name: historical_dim_users_source
+    description: "Initialer Seed für die Userdimension."
+    columns:
+      - name: user_id
+        data_type: BIGINT 
+      - name: historical_effective_from
+        data_type: TIMESTAMP WITH TIME ZONE
+

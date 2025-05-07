@@ -10,32 +10,40 @@ WITH new_order_lines AS (
     -- Wähle nur neue Einträge aus dem Staging-Modell
     SELECT *
     FROM {{ ref('stg_order_products') }}
-    WHERE op_type = 'c' -- Nur Inserts für Order Lines relevant? Annahme hier.
-
-    {% if is_incremental() %}
-      -- Verarbeite nur Staging-Daten, die neuer sind als die letzte Ladung in DIESE Tabelle
-      AND staging_load_timestamp > (SELECT max(staging_load_timestamp) FROM {{ this }})
-    {% endif %}
+    WHERE op_type = 'c' 
 ),
 
 orders_info AS (
-    -- Holen Zeitstempel und User ID von der Bestellung
-    SELECT order_id, user_id, order_timestamp
-    FROM {{ ref('stg_orders') }} -- Annahme: order_timestamp ist hier aktuell
-    -- Ggf. auch hier nur neueste Version pro order_id aus dem Batch holen?
-    QUALIFY ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY source_timestamp_ms DESC, staging_load_timestamp DESC) = 1
+    SELECT
+        order_id,
+        user_id,
+        order_timestamp,
+        to_timestamp(order_timestamp / 1000000.0) AS order_timestamp_ts
+    FROM {{ ref('stg_orders') }}
 ),
 
--- Referenziere die Snapshot-Tabellen!
 snapshot_products AS (
-    SELECT product_id, product_name, aisle, department, source_timestamp_ms, dbt_valid_from, dbt_valid_to
-    FROM {{ ref('scd_products') }} -- Oder source('snapshots', 'scd_products')
+    SELECT 
+        product_id, 
+        product_name, 
+        aisle_name, 
+        department_name, 
+        effective_last_updated_ts, 
+        dbt_scd_id, 
+        dbt_valid_from,
+        dbt_valid_to,
+    FROM {{ ref('dim_products') }} 
 ),
 
 
 snapshot_users AS (
-    SELECT user_id, source_timestamp_ms, dbt_valid_from, dbt_valid_to
-    FROM {{ ref('scd_dim_users') }} -- Annahme: Snapshot existiert
+    SELECT 
+        user_id, 
+        effective_last_updated_ts, 
+        dbt_valid_from,
+        dbt_scd_id, 
+        dbt_valid_to,
+    FROM {{ ref('dim_users') }} 
 ),
 
 dim_date AS (
@@ -43,27 +51,20 @@ dim_date AS (
 )
 
 SELECT
-    -- Schlüssel für die Faktentabelle (könnte auch generiert werden)
     nol.order_id,
-    nol.product_id,
+    nol.product_id, 
 
-    -- Fremdschlüssel zu den Dimensionen (hier Natural Keys, SKs wären ähnlich)
-    -- Join mit Snapshots zum Zeitpunkt der Bestellung!
-    nol.product_id AS dim_product_id, -- Natural Key
-    oi.user_id AS dim_user_id,       -- Natural Key
-    COALESCE(dd.date_sk, -1) AS order_date_sk, -- Surrogate Key Datum
+    -- === WICHTIG: Surrogate Keys aus den Snapshots ===
+    sp.dbt_scd_id AS product_version_sk, -- Oder einen Hash von -1 wenn es ein Hash ist
+    su.dbt_scd_id AS user_version_sk,   -- Oder einen Hash von -1 wenn es ein Hash ist
+    dd.date_sk  AS order_date_sk, -- Das war schon korrekt
 
     -- Kennzahlen
     nol.add_to_cart_order,
 
     -- Metadaten (optional, aber nützlich)
     oi.order_timestamp,
-    nol.staging_load_timestamp -- Wichtig für inkrementelle Logik oben
-
-    -- Surrogate Keys aus Snapshots holen (optional)
-    -- (Benötigt SKs im Snapshot SELECT)
-    -- COALESCE(sp.product_sk, -1) AS product_sk,
-    -- COALESCE(su.user_sk, -1) AS user_sk
+    nol.staging_load_timestamp
 
 FROM new_order_lines nol
 INNER JOIN orders_info oi ON nol.order_id = oi.order_id
@@ -71,17 +72,22 @@ INNER JOIN orders_info oi ON nol.order_id = oi.order_id
 -- Join mit Produkt-Snapshot zum Zeitpunkt der Bestellung
 LEFT JOIN snapshot_products sp
     ON nol.product_id = sp.product_id
-    AND oi.order_timestamp >= sp.dbt_valid_from
-    AND oi.order_timestamp < COALESCE(sp.dbt_valid_to, '9999-12-31 23:59:59'::timestamp)
+    -- Vergleiche TIMESTAMP mit TIMESTAMP
+    AND oi.order_timestamp_ts >= sp.dbt_valid_from  -- sp.dbt_valid_from ist TIMESTAMP
+    AND oi.order_timestamp_ts < COALESCE(
+                                    sp.dbt_valid_to, -- ist TIMESTAMP
+                                    to_timestamp(4113387935) -- Fallback ist jetzt auch TIMESTAMP (entspricht 4113387935000000 / 1000000)
+                                )
 
 -- Join mit User-Snapshot zum Zeitpunkt der Bestellung
 LEFT JOIN snapshot_users su
     ON oi.user_id = su.user_id
-    AND oi.order_timestamp >= su.dbt_valid_from
-    AND oi.order_timestamp < COALESCE(su.dbt_valid_to, '9999-12-31 23:59:59'::timestamp)
+    -- Vergleiche TIMESTAMP mit TIMESTAMP
+    AND oi.order_timestamp_ts >= su.dbt_valid_from -- su.dbt_valid_from ist TIMESTAMP
+    AND oi.order_timestamp_ts < COALESCE(
+                                    su.dbt_valid_to, -- ist TIMESTAMP
+                                    to_timestamp(4113387935) -- Fallback ist jetzt auch TIMESTAMP
+                                )
 
 -- Join mit Datum
-LEFT JOIN dim_date dd ON oi.order_timestamp::date = dd.full_date
-
--- Die WHERE-Klausel im 'is_incremental()' Block oben filtert bereits nur neue Zeilen.
--- Die Standard-Strategie 'merge' (oder 'append' wenn kein unique_key definiert) fügt diese hinzu.
+LEFT JOIN dim_date dd ON CAST(strftime(to_timestamp(oi.order_timestamp / 1000000), '%Y%m%d') AS INTEGER) = dd.date_sk

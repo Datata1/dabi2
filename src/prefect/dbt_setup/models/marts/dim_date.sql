@@ -8,14 +8,11 @@
 -- Schritt 1: Finde den ersten und letzten Bestelldatum als Jinja-Variablen
 {%- set date_query %}
     SELECT
-        MIN(order_timestamp::date) as start_date, -- Spalte aus dem neuen stg_orders
-        MAX(order_timestamp::date) as end_date
+        CAST(to_timestamp(MIN(order_timestamp) / 1000000) AS DATE) as start_date, -- Convert microsecond timestamp to date
+        CAST(to_timestamp(MAX(order_timestamp) / 1000000) AS DATE) as end_date   -- Convert microsecond timestamp to date
     FROM {{ ref('stg_orders') }} -- Nutzt das neue Staging-Modell
 {% endset -%}
 
-{# Restlicher Code bleibt wie gehabt, verwendet DuckDB-konforme Funktionen #}
-{# ... (run_query, Logik mit date_spine, Attribut-Extraktion) ... #}
-{# Stellen Sie sicher, dass dbt_utils installiert ist: packages.yml -> dbt deps #}
 
 {%- set query_result = run_query(date_query) -%}
 {{ log("run_query result: " ~ query_result, info=True) }}
@@ -50,10 +47,8 @@
             END AS is_weekend
         FROM date_spine d
     {% else %}
-        {{ log("WARNUNG: Start- oder Enddatum ist NULL. dim_date wird leer sein.", info=True) }}
         SELECT CAST(NULL AS DATE) AS full_date, CAST(NULL AS INTEGER) AS date_sk, CAST(NULL AS INTEGER) AS year, CAST(NULL AS INTEGER) AS month, CAST(NULL AS INTEGER) AS day, CAST(NULL AS INTEGER) AS day_of_week, CAST(NULL AS INTEGER) AS day_of_year, CAST(NULL AS INTEGER) AS week_of_year, CAST(NULL AS INTEGER) AS quarter, CAST(NULL AS BOOLEAN) AS is_weekend LIMIT 0
     {% endif %}
 {% else %}
-    {{ log("FEHLER: run_query für Datumsbereich hat keine Ergebnisse geliefert. dim_date wird leer sein.", info=True) }}
     SELECT CAST(NULL AS DATE) AS full_date, CAST(NULL AS INTEGER) AS date_sk, CAST(NULL AS INTEGER) AS year, CAST(NULL AS INTEGER) AS month, CAST(NULL AS INTEGER) AS day, CAST(NULL AS INTEGER) AS day_of_week, CAST(NULL AS INTEGER) AS day_of_year, CAST(NULL AS INTEGER) AS week_of_year, CAST(NULL AS INTEGER) AS quarter, CAST(NULL AS BOOLEAN) AS is_weekend LIMIT 0
 {% endif %}

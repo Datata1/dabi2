@@ -98,3 +98,28 @@ make down
 curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" \
 localhost:8083/connectors/ -d @debezium-pg-connector.json
 ```
+
+#### change permissions for duckdb file when dbeaver cant connect to it
+```sh
+sudo chown $(id -u):$(id -g) ~/path/to/dev.duckdb
+```
+
+#### remove docker stuff
+```sh
+docker system prune -a -f --volumes
+```
+
+#### TODO:
+- trigger dwh flowrun with cdc_consumer -> this leads to less queued flow runs and only on demand
+- set up dbt correctly, scd and starschema and delta load 
+- draw architecture charts (ERM, star-schema, dataflow chart)
+- reduce logs in general and create prefect artifacts wherever its useful
+- work on comments, just leave the important 
+- create a curated list of sources and tutorials about prefect and dbt on the Readme.md
+- create a curated list of useful commands (Linux)
+- skip initial flow run when tables are already there
+- refactor flows
+- provision_debezium when cdc_consumer starts up instead of running sh script 
+- refactor dbt flow -> convert all time data to the same format in intermediate step! 
+- add tests to dbt runs
+- detail: close duckDB when not used anymore in flow (if not closed we need to wait until the flow ends)

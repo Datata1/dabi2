@@ -72,23 +72,6 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8001"
-
-  db-explorer:
-    container_name: pgweb_explorer_dabi2
-    image: sosedoff/pgweb:latest
-    command: pgweb --url=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?sslmode=disable --bind=0.0.0.0 --prefix=db-admin --skip-open
-    environment:
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_HOST=db
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_NAME=${DB_NAME}
-    depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
-    ports:
-      - "8081:8081" 
   
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.2 # Beispielversion, prüfe Kompatibilität
@@ -285,7 +268,6 @@ services:
       - caddy_config:/config
     depends_on:
       - prefect
-      - db-explorer
       - jupyter-lab 
       - minio
 

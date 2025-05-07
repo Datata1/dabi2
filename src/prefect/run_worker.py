@@ -86,27 +86,17 @@ async def create_or_get_minio_block(block_name: str, access_key: str, secret_key
         # 1. Versuchen, den Block mit der spezifischen Klasse zu laden
         loaded_block = await MinIOCredentials.load(block_name)
         logger.info(f"Block '{block_name}' vom Typ 'MinIOCredentials' existiert bereits.")
-        # Optional: Hier könnte man eine Update-Logik einbauen, falls Credentials geändert wurden
-        # loaded_block.minio_root_user = access_key
-        # loaded_block.minio_root_password = secret_key # SecretStr behandelt das sicher
-        # await loaded_block.save(block_name, overwrite=True)
-        # logger.info(f"Block '{block_name}' aktualisiert.")
         return loaded_block
 
     except ValueError as e:
-        # .load() wirft oft ValueError, wenn der Block nicht gefunden wird.
-        # Prüfen Sie die Fehlermeldung genauer für Robustheit.
         if "Unable to find block document" in str(e) or f"Block document with name '{block_name}' not found" in str(e):
             logger.info(f"Block '{block_name}' nicht gefunden. Erstelle...")
             try:
-                # 2. Block-Instanz mit den spezifischen Attributen erstellen
                 minio_block = MinIOCredentials(
                     minio_root_user=access_key,
                     minio_root_password=secret_key
-                    # region_name ist optional
                 )
                 # 3. Block speichern
-                # overwrite=False stellt sicher, dass wir keinen existierenden Block überschreiben
                 await minio_block.save(block_name, overwrite=False)
                 logger.info(f"Block '{block_name}' erfolgreich erstellt.")
                 return minio_block # Geben die neu erstellte Instanz zurück

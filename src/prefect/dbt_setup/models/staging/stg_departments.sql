@@ -1,7 +1,7 @@
 SELECT
-    department_id::INTEGER,
+    department_id::INTEGER AS department_id,
     department,
-    "__op" AS op_type,
-    "__source_ts_ms" AS source_timestamp_ms,
+    "_op" AS op_type,
+    "_ts_ms" AS source_timestamp_ms,
     load_ts AS staging_load_timestamp
-FROM {{ source('cdc_staging', 'departments') }};
+FROM {{ source('cdc_staging', 'departments') }}

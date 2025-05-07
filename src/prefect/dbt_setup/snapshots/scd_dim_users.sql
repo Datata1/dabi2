@@ -1,29 +1,31 @@
--- snapshots/scd_dim_users.sql
-{% snapshot scd_dim_users %}
+-- snapshots/scd_dim_users.sql (Korrigiert)
+{% snapshot dim_users %}
+
+{% set updated_at_column = 'effective_last_updated_ts' %} 
+
 
 {{
     config(
-      target_schema='snapshots',         
-      strategy='timestamp',             
-      unique_key='user_id',             
-      updated_at='source_timestamp_ms', 
-      invalidate_hard_deletes=True,      
+      target_schema='main',
+      unique_key='user_id',
+      strategy='timestamp',
+      updated_at=updated_at_column, 
+      invalidate_hard_deletes=True
     )
 }}
 
--- Wähle die Spalten aus der Zieldimensionstabelle (dim_users) aus,
--- deren Historie du verfolgen möchtest.
--- 'unique_key' und 'updated_at' müssen enthalten sein.
-select
-    -- Der Business Key
-    user_id,
+{% if var('is_initial_snapshot_load', false) %}
 
-    -- Spalten, deren Änderungen verfolgt werden sollen
-    is_active, -- Wichtig, um zu sehen, wann ein User (logisch) gelöscht wurde
+  SELECT
+      user_id,
+      CAST(historical_effective_from AS TIMESTAMP WITH TIME ZONE) AS effective_last_updated_ts
+  FROM {{ ref('historical_dim_users_source') }}
 
-    -- Der Zeitstempel, der für die 'timestamp'-Strategie verwendet wird
-    source_timestamp_ms
+{% else %}
 
-from {{ ref('dim_users') }} -- Quelle ist die finale, inkrementell gebaute User-Dimension
+
+  SELECT * FROM {{ ref('int_user_snapshot_input') }}
+
+{% endif %}
 
 {% endsnapshot %}

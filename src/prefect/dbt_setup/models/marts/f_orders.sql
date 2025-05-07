@@ -1,4 +1,4 @@
--- models/marts/f_orders.sql (Angepasst für CDC und Snapshots)
+-- models/marts/f_orders.sql (Angepasst für CDC und Snapshots mit Surrogate Keys)
 {{
     config(
         materialized='incremental',
@@ -9,7 +9,14 @@
 WITH latest_orders AS (
     -- Wähle den letzten Stand jeder Bestellung aus dem aktuellen Batch
     SELECT
-        *,
+        order_id,
+        user_id,
+        order_timestamp, -- Der originale BIGINT (Mikrosekunden)
+        to_timestamp(order_timestamp / 1000000.0) AS order_timestamp_ts, -- Konvertiert zu TIMESTAMP
+        tip_given,
+        op_type,
+        source_timestamp_ms,
+        staging_load_timestamp,
         ROW_NUMBER() OVER (
             PARTITION BY order_id
             ORDER BY source_timestamp_ms DESC, staging_load_timestamp DESC
@@ -21,10 +28,15 @@ WITH latest_orders AS (
     {% endif %}
 ),
 
--- Referenziere die Snapshot-Tabellen!
+-- Referenziere die Snapshot-Tabellen und wähle den Surrogate Key (dbt_scd_id) aus!
 snapshot_users AS (
-    SELECT user_id, source_timestamp_ms, dbt_valid_from, dbt_valid_to
-    FROM {{ ref('scd_dim_users') }} -- Annahme: Snapshot existiert
+    SELECT
+        dbt_scd_id, -- Surrogate Key für die User-Version
+        user_id,    -- Natural Key für den Join
+        dbt_valid_from, -- Ist TIMESTAMP WITH TIME ZONE
+        dbt_valid_to,   -- Ist TIMESTAMP WITH TIME ZONE
+        -- source_timestamp_ms (kann hier auch selektiert werden, falls benötigt)
+    FROM {{ ref('dim_users') }} -- Annahme: Snapshot existiert
 ),
 
 dim_date AS (
@@ -35,19 +47,16 @@ SELECT
     -- Schlüssel
     lo.order_id,
 
-    -- Fremdschlüssel (Natural Key oder Surrogate Key aus Snapshot)
-    lo.user_id AS dim_user_id, -- Natural Key
-    -- COALESCE(su.user_sk, -1) AS user_sk, -- Surrogate Key aus Snapshot
+    -- Fremdschlüssel
+    lo.user_id AS user_id,
+    su.dbt_scd_id AS user_version_sk,
     COALESCE(dd.date_sk, -1) AS order_date_sk,
 
-    -- Kennzahlen/Attribute der Bestellung
-    lo.tip_given, -- Direkt aus den Order-Daten
+    lo.tip_given,
 
-    -- Status basierend auf letzter Operation
     CASE WHEN lo.op_type = 'd' THEN FALSE ELSE TRUE END AS is_active_order,
 
-    -- Metadaten
-    lo.order_timestamp,
+    lo.order_timestamp, -- Der originale BIGINT Wert
     lo.source_timestamp_ms,
     lo.staging_load_timestamp
 
@@ -56,14 +65,13 @@ FROM latest_orders lo
 -- Join mit User-Snapshot zum Zeitpunkt der Bestellung
 LEFT JOIN snapshot_users su
     ON lo.user_id = su.user_id
-    AND lo.order_timestamp >= su.dbt_valid_from
-    AND lo.order_timestamp < COALESCE(su.dbt_valid_to, '9999-12-31 23:59:59'::timestamp)
+    AND lo.order_timestamp_ts >= su.dbt_valid_from 
+    AND lo.order_timestamp_ts < COALESCE(
+                                    su.dbt_valid_to, -- ist TIMESTAMP
+                                    to_timestamp(4113387935) -- Fallback ist jetzt auch TIMESTAMP (entspricht 4113387935000000 Mikrosekunden / 1000000)
+                                )
 
--- Join mit Datum
-LEFT JOIN dim_date dd ON lo.order_timestamp::date = dd.full_date
+-- Join mit Datum (dieser Teil bleibt unverändert, da er den BIGINT lo.order_timestamp für die date_sk Berechnung benötigt)
+LEFT JOIN dim_date dd ON CAST(strftime(to_timestamp(lo.order_timestamp / 1000000.0), '%Y%m%d') AS INTEGER) = dd.date_sk
 
 WHERE lo.rn = 1 -- Nur den aktuellsten Stand aus dem Batch verarbeiten
-
--- Die MERGE-Logik von dbt (basierend auf unique_key='order_id') wird:
--- 1. Neue Orders einfügen.
--- 2. Bestehende Orders aktualisieren (z.B. wenn tip_given sich ändert oder is_active).

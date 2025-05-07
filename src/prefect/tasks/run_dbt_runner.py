@@ -35,7 +35,6 @@ def run_dbt_command_runner(
         settings = PrefectDbtSettings(
             project_dir=project_dir,
             profiles_dir=profiles_dir
-            # Profil & Target werden automatisch aus profiles.yml/Umgebung gelesen
         )
 
         # 2. Runner instanziieren
