@@ -1,17 +1,29 @@
--- snapshots/scd_dim_products.sql (Korrigiert)
+-- snapshots/scd_dim_products.sql (Mit bedingter Strategie)
 {% snapshot dim_products %}
 
-{% set updated_at_column = 'effective_last_updated_ts' %} 
+{% set snapshot_config = {
+      'target_schema': 'main',
+      'unique_key': 'product_id',
+      'invalidate_hard_deletes': True
+    }
+%}
 
+{% if var('is_initial_snapshot_load', false) %}
+  {% do snapshot_config.update({
+        'strategy': 'timestamp',                   
+        'updated_at': 'effective_last_updated_ts' 
+     })
+  %}
+{% else %}
+  {% do snapshot_config.update({
+        'strategy': 'check',                      
+        'check_cols': ['product_name', 'aisle_id', 'aisle_name', 'department_id', 'department_name'] 
+     })
+  %}
+{% endif %}
 
 {{
-    config(
-      target_schema='main',
-      unique_key='product_id',
-      strategy='timestamp',
-      updated_at=updated_at_column, 
-      invalidate_hard_deletes=True
-    )
+    config(**snapshot_config) 
 }}
 
 {% if var('is_initial_snapshot_load', false) %}
@@ -28,7 +40,15 @@
 
 {% else %}
 
-  SELECT * FROM {{ ref('int_product_snapshot_input') }}
+  SELECT
+      product_id,
+      product_name,
+      aisle_id,
+      aisle_name,
+      department_id,
+      department_name,
+      effective_last_updated_ts
+  FROM {{ ref('int_product_snapshot_input') }}
 
 {% endif %}
 

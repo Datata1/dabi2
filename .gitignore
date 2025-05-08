@@ -6,8 +6,8 @@ deliverables/*.synctex.gz
 
 .venv
 .ipynb_checkpoints
-__pycache__
+__pycache__/
 *.pyc
 
 dev.duckdb
-*.wal
+dev.duckdb.wal

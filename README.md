@@ -123,3 +123,5 @@ docker system prune -a -f --volumes
 - refactor dbt flow -> convert all time data to the same format in intermediate step! 
 - add tests to dbt runs
 - detail: close duckDB when not used anymore in flow (if not closed we need to wait until the flow ends)
+- after oltp is set up connect debezium and only cdc events from oders and order_lines get created and stored in minio, initial only with seeds
+- We need to do that because we want to have build our initial dimensions without breaking fact table building
