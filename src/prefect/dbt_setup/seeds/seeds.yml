@@ -2,8 +2,35 @@
 version: 2
 
 seeds:
-  - name: historical_dim_products_source 
-    description: "Initialer Seed für die Produktdimension mit historischem dbt_valid_from."
+  
+  - name: stg_raw_aisles
+    description: "Initialer Seed für die Aisles."
+    columns:
+      - name: aisle_id
+        data_type: BIGINT 
+      - name: aisle_name
+        data_type: VARCHAR
+      - name: load_ts
+        data_type: TIMESTAMP WITH TIME ZONE
+      - name: _op
+        data_type: VARCHAR
+      - name: _ts_ms
+        data_type: BIGINT
+  - name: stg_raw_departments
+    description: "Initialer Seed für die Departments."
+    columns:
+      - name: department_id
+        data_type: BIGINT 
+      - name: department_name
+        data_type: VARCHAR
+      - name: load_ts
+        data_type: TIMESTAMP WITH TIME ZONE
+      - name: _op
+        data_type: VARCHAR
+      - name: _ts_ms
+        data_type: BIGINT
+  - name: stg_raw_products
+    description: "Initialer Seed für die Produkte."
     columns:
       - name: product_id
         data_type: BIGINT 
@@ -11,21 +38,23 @@ seeds:
         data_type: VARCHAR
       - name: aisle_id
         data_type: BIGINT
-      - name: aisle_name
-        data_type: VARCHAR
       - name: department_id
         data_type: BIGINT
-      - name: department_name
+      - name: load_ts
+        data_type: TIMESTAMP WITH TIME ZONE
+      - name: _op
         data_type: VARCHAR
-      - name: historical_effective_from
-        data_type: TIMESTAMP WITH TIME ZONE 
-
-
-  - name: historical_dim_users_source
-    description: "Initialer Seed für die Userdimension."
+      - name: _ts_ms
+        data_type: BIGINT
+  - name: stg_raw_users
+    description: "Initialer Seed für die User."
     columns:
       - name: user_id
         data_type: BIGINT 
-      - name: historical_effective_from
+      - name: load_ts
         data_type: TIMESTAMP WITH TIME ZONE
+      - name: _op
+        data_type: VARCHAR
+      - name: _ts_ms
+        data_type: BIGINT
 

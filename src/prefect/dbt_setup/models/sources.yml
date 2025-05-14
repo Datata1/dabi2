@@ -29,5 +29,5 @@ sources:
       - name: orders
         identifier: stg_raw_orders
 
-      - name: order_products # Name aus der DB/Kafka-Topic
-        identifier: stg_raw_order_products # Name der Tabelle in DuckDB
+      - name: order_products 
+        identifier: stg_raw_order_products 

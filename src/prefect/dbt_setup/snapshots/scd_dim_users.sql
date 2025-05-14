@@ -14,18 +14,9 @@
     )
 }}
 
-{% if var('is_initial_snapshot_load', false) %}
 
-  SELECT
-      user_id,
-      CAST(historical_effective_from AS TIMESTAMP WITH TIME ZONE) AS effective_last_updated_ts
-  FROM {{ ref('historical_dim_users_source') }}
-
-{% else %}
+SELECT * FROM {{ ref('int_user_snapshot_input') }}
 
 
-  SELECT * FROM {{ ref('int_user_snapshot_input') }}
-
-{% endif %}
 
 {% endsnapshot %}

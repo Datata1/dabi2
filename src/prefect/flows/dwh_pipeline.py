@@ -157,7 +157,7 @@ def load_files_to_duckdb_staging( # async entfernt
                 try:
                     insert_start_time = time.time()
                     insert_sql = f"""
-                        INSERT INTO "{target_staging_table}"  -- Anführungszeichen um Tabellennamen
+                        INSERT INTO "{target_staging_table}"  
                         SELECT *, now()
                         FROM read_parquet('{file_path}');
                     """ 
@@ -292,7 +292,7 @@ def cdc_minio_to_duckdb_flow(): # Name angepasst für Klarheit
         # 3.2 Staging Models 
         logger.info("Running DBT Staging models...")
         staging_result = run_dbt_command_runner( 
-            dbt_args=["build"],
+            dbt_args=["build", "--resource-type", "model", "--resource-type", "snapshot"],
             project_dir=DBT_PROJECT_DIR,
             profiles_dir=DBT_PROFILES_DIR
         )

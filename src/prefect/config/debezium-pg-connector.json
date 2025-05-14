@@ -1,0 +1,25 @@
+{
+    "name": "oltp-postgres-connector",
+    "config": {
+      "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+      "tasks.max": "1",
+      "database.hostname": "db",
+      "database.user": "datata1",  
+      "database.port": 5432, 
+      "database.password": "devpassword", 
+      "database.dbname": "oltp",    
+      "database.server.name": "oltp_dabi_server",
+      "topic.prefix": "cdc.oltp_dabi",
+      "schema.include.list": "public",
+      "table.include.list": "public.orders,public.order_products,public.products,public.users,public.aisles,public.departments",
+      "plugin.name": "pgoutput",
+      "publication.autocreate.mode": "filtered",
+      "slot.drop.on.stop": "false",
+      "snapshot.mode": "never",
+      "decimal.handling.mode": "double",
+      "transforms": "unwrap",
+      "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+      "transforms.unwrap.delete.handling.mode": "rewrite",
+      "transforms.unwrap.add.fields": "op,ts_ms"
+    }
+  }

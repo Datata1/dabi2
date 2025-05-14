@@ -3,6 +3,7 @@
     config(
         materialized='incremental',
         unique_key=['order_id', 'product_id'], 
+        tags=['marts_model'],
     )
 }}
 

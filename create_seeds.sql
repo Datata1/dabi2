@@ -1,27 +1,40 @@
+-- RAW AISLES
 SELECT
-    p.product_id,
-    p.product_name,
-    p.aisle_id,
-    a.aisle AS aisle_name,
-    p.department_id,
-    d.department AS department_name,
-    '1900-01-01 00:00:00'::TIMESTAMP AS historical_effective_from
+    aisle_id,
+    aisle,
+    'c' AS _op,
+    0::BIGINT AS _ts_ms, -- Setzt _ts_ms auf 0
+    '1970-01-01 00:00:00.000 +0000'::timestamptz AS load_ts -- Setzt load_ts auf den Beginn der Epoche
 FROM
-    products p  
-LEFT JOIN
-    aisles a ON p.aisle_id = a.aisle_id
-LEFT JOIN
-    departments d ON p.department_id = d.department_id
-ORDER BY
-    p.product_id
-;
+    aisles;
 
+-- RAW DEPARTMENTS
 SELECT
-    u.user_id,
-    '1900-01-01 00:00:00'::TIMESTAMP AS historical_effective_from
-
+    department_id,
+    department,
+    'c' AS _op,
+    0::BIGINT AS _ts_ms,
+    '1970-01-01 00:00:00.000 +0000'::timestamptz AS load_ts
 FROM
-    users u 
-ORDER BY
-    u.user_id
-;
+    departments;
+
+-- RAW PRODUCTS
+SELECT
+    product_id,
+    product_name,
+    aisles_id,
+    department_id,
+    'c' AS _op,
+    0::BIGINT AS _ts_ms,
+    '1970-01-01 00:00:00.000 +0000'::timestamptz AS load_ts
+FROM
+    products;
+
+-- RAW USERS
+SELECT
+    user_id,
+    'c' AS _op,
+    0::BIGINT AS _ts_ms,
+    '1970-01-01 00:00:00.000 +0000'::timestamptz AS load_ts
+FROM
+    users;

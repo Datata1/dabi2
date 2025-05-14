@@ -67,8 +67,6 @@ services:
         condition: service_started
       kafka-connect:
           condition: service_healthy
-      debezium-provisioner:
-         condition: service_completed_successfully
     restart: unless-stopped
     ports:
       - "8001:8001"
@@ -141,16 +139,16 @@ services:
         timeout: 5s
         retries: 5
 
-  debezium-provisioner:
-    image: curlimages/curl:latest # Kleines Image mit curl
-    container_name: debezium_provisioner_dabi2
-    depends_on:
-      kafka-connect:
-        condition: service_healthy 
-    volumes:
-      - ./config/kafka-connect/debezium-pg-connector.json:/config/debezium-pg-connector.json:ro
-      - ./config/kafka-connect/provision_debezium.sh:/config/provision_debezium.sh:ro
-    command: ["/bin/sh", "/config/provision_debezium.sh"]
+  # debezium-provisioner:
+  #   image: curlimages/curl:latest # Kleines Image mit curl
+  #   container_name: debezium_provisioner_dabi2
+  #   depends_on:
+  #     kafka-connect:
+  #       condition: service_healthy 
+  #   volumes:
+  #     - ./config/kafka-connect/debezium-pg-connector.json:/config/debezium-pg-connector.json:ro
+  #     - ./config/kafka-connect/provision_debezium.sh:/config/provision_debezium.sh:ro
+  #   command: ["/bin/sh", "/config/provision_debezium.sh"]
   
   akhq:
     image: tchiotludo/akhq:latest 
@@ -241,8 +239,6 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy # Sicherstellen, dass MinIO läuft
-      debezium-provisioner:
-        condition: service_completed_successfully
     environment:
       # Verbindungen
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
@@ -253,6 +249,7 @@ services:
       # Kafka Konfiguration
       - KAFKA_TOPIC_PATTERN=^cdc\.oltp_dabi\.public\.(.*) # Passe Prefix/Schema an
       - CONSUMER_GROUP_ID=dabi2-minio-lake-writer-${HOSTNAME} # Eindeutige Group ID pro Instanz (optional)
+      - PREFECT_API_URL=http://prefect:4200/api
       # - MINIO_USE_SSL=false # Falls nötig
     restart: unless-stopped
 

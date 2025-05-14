@@ -3,6 +3,8 @@ import os
 import sys
 import json
 import time
+import asyncio
+from uuid import UUID
 from datetime import datetime
 from collections import defaultdict
 from confluent_kafka import Consumer, KafkaError, KafkaException
@@ -14,6 +16,8 @@ from minio.error import S3Error
 from io import BytesIO
 import signal
 import logging
+
+from prefect import get_client
 
 # --- Konfiguration aus Umgebungsvariablen ---
 KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'kafka:29092')
@@ -146,16 +150,35 @@ def write_batches_to_minio(client: Minio):
             if 'month' in df.columns: df['month'] = df['month'].astype(str)
             if 'day' in df.columns: df['day'] = df['day'].astype(str)
 
+            columns_to_omit = [
+                '_kafka_topic',  
+                '_processing_ts', 
+                'year', 
+                'month',
+                'day',
+                '_deleted',
+            ]
+
+            actual_columns_to_omit = [col for col in columns_to_omit if col in df.columns]
+
+
             file_timestamp = processing_time_for_batch.strftime('%Y%m%d_%H%M%S_%f')
-            # Verwende die Partitionsspalten, die den Records hinzugefügt wurden
             year_part = records_to_write[0]['year']
             month_part = records_to_write[0]['month']
             day_part = records_to_write[0]['day']
             object_name = f"cdc_events/{table_name}/year={year_part}/month={month_part}/day={day_part}/{table_name}_{file_timestamp}.parquet"
 
+            if actual_columns_to_omit: 
+                df_for_parquet = df.drop(columns=actual_columns_to_omit)
+                print("if: actual df_for_parquet columns: ", df_for_parquet.columns)
+            else:
+                df_for_parquet = df
+                print("else: actual df_for_parquet columns: ", df_for_parquet.columns)
+
+
             print(f"Schreibe DataFrame ({len(df)} Zeilen) nach MinIO: {MINIO_BUCKET}/{object_name}")
             out_buffer = BytesIO()
-            df.to_parquet(out_buffer, index=False, engine='pyarrow', compression='snappy')
+            df_for_parquet.to_parquet(out_buffer, index=False, engine='pyarrow', compression='snappy')
             out_buffer.seek(0)
 
             client.put_object(
@@ -166,10 +189,24 @@ def write_batches_to_minio(client: Minio):
                 content_type='application/parquet'
             )
             print(f"Upload für {object_name} erfolgreich.")
-            # Nachrichten aus dem Puffer entfernen, die erfolgreich geschrieben wurden
+            
+            try:
+                logger.info("Versuche, DWH Prefect Flow Run zu triggern...")
+                # Rufe die asynchrone Hilfsfunktion synchron auf
+                flow_run_id = asyncio.run(_trigger_prefect_dwh_flow_run_async(logger)) 
+                if flow_run_id:
+                    logger.info(f"DWH Flow Run wurde erfolgreich getriggert mit ID: {flow_run_id}")
+                else:
+                    logger.warning("DWH Flow Run konnte nicht getriggert werden (Details siehe vorherige Logs).")
+            except Exception as e_trigger: 
+                logger.error(f"FEHLER beim Versuch, den DWH Flow Run zu triggern: {e_trigger}", exc_info=True)
+
+
             message_buffer[topic] = message_buffer[topic][len(payloads_for_this_batch):]
             if not message_buffer[topic]: # Wenn Liste jetzt leer ist
                 del message_buffer[topic] # Topic-Eintrag aus Puffer entfernen
+
+
 
         except Exception as e_batch:
             print(f"FEHLER beim Verarbeiten/Upload des Batches für Topic {topic}: {e_batch}", exc_info=True)
@@ -178,6 +215,33 @@ def write_batches_to_minio(client: Minio):
 
     print(f"({datetime.now()}) Schreibzyklus beendet. Erfolg aller Topics in diesem Zyklus: {all_writes_in_cycle_successful}")
     return all_writes_in_cycle_successful
+
+async def _trigger_prefect_dwh_flow_run_async(logger_param: logging.Logger):
+    try:
+        async with get_client() as client: 
+            flow_name = "cdc_minio_to_duckdb_flow" 
+            deployment_name = "dwh-pipeline"
+            name = f"{flow_name}/{deployment_name}" 
+            
+            logger_param.info(f"Lese Deployment '{name}'...")
+            deployment_details = await client.read_deployment_by_name(name=name)
+            
+            if not deployment_details:
+                logger_param.error(f"Deployment '{name}' nicht gefunden.")
+                return None
+
+            deployment_id_to_trigger = deployment_details.id 
+            
+            logger_param.info(f"Triggere DWH Flow Run von Deployment ID: {deployment_id_to_trigger} (Name: {name})...")
+            flow_run = await client.create_flow_run_from_deployment(
+                deployment_id=deployment_id_to_trigger, 
+                name=f"dwh-run-triggered-by-cdc-{datetime.now().strftime('%Y%m%d%H%M%S')}", 
+            )
+            logger_param.info(f"DWH Flow Run (ID: {flow_run.id}) erfolgreich getriggert.")
+            return flow_run.id
+    except Exception as e:
+        logger_param.error(f"Fehler in _trigger_prefect_dwh_flow_run_async: {e}", exc_info=True)
+        return None
 
 # --- Graceful Shutdown Handler ---
 def shutdown_handler(signum, frame):
