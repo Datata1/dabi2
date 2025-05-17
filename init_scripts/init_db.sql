@@ -19,12 +19,11 @@ CREATE TABLE IF NOT EXISTS products (
     product_name TEXT,
     aisle_id INTEGER,
     department_id INTEGER,
-    -- Foreign Key Constraints
+
     CONSTRAINT fk_products_aisle FOREIGN KEY (aisle_id) REFERENCES aisles(aisle_id),
     CONSTRAINT fk_products_department FOREIGN KEY (department_id) REFERENCES departments(department_id)
 );
 
--- Indizes für Foreign Keys (oft gut für Performance)
 CREATE INDEX IF NOT EXISTS ix_products_aisle ON products (aisle_id);
 CREATE INDEX IF NOT EXISTS ix_products_department ON products (department_id);
 
@@ -37,9 +36,7 @@ CREATE TABLE IF NOT EXISTS orders (
     CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
--- Index für häufige Abfragen/Joins
 CREATE INDEX IF NOT EXISTS ix_orders_user_timestamp ON orders (user_id, order_date);
-
 
 CREATE TABLE IF NOT EXISTS order_products (
     order_id BIGINT NOT NULL,

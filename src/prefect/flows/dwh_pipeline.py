@@ -19,7 +19,7 @@ MINIO_SERVICE_NAME = "minio"
 MINIO_PORT = 9000
 CDC_STAGING_PREFIX = "cdc_events/"
 CDC_ARCHIVE_PREFIX = "cdc-archive/"
-DUCKDB_PATH = "/app/prefect/dbt_setup/dev.duckdb"
+DUCKDB_PATH = "/app/dbt_setup/dev.duckdb"
 STAGING_TABLE_PREFIX = "stg_raw_"
 MINIO_BLOCK_NAME = "minio-credentials"
 MINIO_RAW_ENDPOINT = f"{MINIO_SERVICE_NAME}:{MINIO_PORT}"
@@ -27,7 +27,7 @@ MINIO_DUCKDB_ENDPOINT = f"http://{MINIO_SERVICE_NAME}:{MINIO_PORT}/datalake"
 MINIO_USE_SSL = False
 
 APP_DIR = Path("/app")
-DBT_PROJECT_DIR = APP_DIR / "prefect" / "dbt_setup"
+DBT_PROJECT_DIR = APP_DIR / "dbt_setup"
 DBT_PROFILES_DIR = DBT_PROJECT_DIR
 
 # --- Tasks ---

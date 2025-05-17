@@ -5,7 +5,7 @@ from prefect import flow, get_run_logger
 from tasks.debezium_tasks import load_debezium_config_task, activate_debezium_connector_task
 
 # Konfiguration für Debezium (aus Umgebungsvariablen)
-DEBEZIUM_CONFIG_FILE = os.getenv("DEBEZIUM_CONFIG_FILE", "/app/prefect/config/debezium-pg-connector.json")
+DEBEZIUM_CONFIG_FILE = os.getenv("DEBEZIUM_CONFIG_FILE", "/app/config/debezium-pg-connector.json")
 DEBEZIUM_CONNECTOR_NAME = os.getenv("DEBEZIUM_CONNECTOR_NAME", "oltp-postgres-connector")
 KAFKA_CONNECT_URL = os.getenv("KAFKA_CONNECT_URL", "http://kafka-connect:8083/connectors")
 

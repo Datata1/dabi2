@@ -40,7 +40,7 @@ MINIO_SECRET_KEY = os.environ.get("MINIO_ROOT_PASSWORD", "minio_secret_password"
 
 # --- Konfiguration --- 
 WORK_POOL_NAME = "dabi2"
-APP_BASE_PATH = Path("/app/prefect/")
+APP_BASE_PATH = Path("/app/")
 
 # --- Konfiguration für DWH Flow ---
 DWH_DEPLOYMENT_NAME = "dwh-pipeline"

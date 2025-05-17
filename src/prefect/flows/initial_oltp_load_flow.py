@@ -13,7 +13,7 @@ from tasks.debezium_tasks import load_debezium_config_task, activate_debezium_co
 
 
 APP_DIR = Path("/app")
-DBT_PROJECT_DIR = APP_DIR / "prefect" / "dbt_setup"
+DBT_PROJECT_DIR = APP_DIR / "dbt_setup"
 DBT_PROFILES_DIR = DBT_PROJECT_DIR
 
 @flow(name="Initial OLTP Load from Files (Multi-Task)")
@@ -28,7 +28,7 @@ def initial_oltp_load_flow():
     # Debezium Connector Konfiguration
     debezium_connector_name = "oltp-postgres-connector"
     kafka_connect_url = "http://kafka-connect:8083/connectors"
-    debezium_config_file = "/app/prefect/config/debezium-pg-connector.json" 
+    debezium_config_file = "/app/config/debezium-pg-connector.json" 
 
 
     logger.info("build DuckDB seeds...")
