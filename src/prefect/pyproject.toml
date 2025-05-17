@@ -1,10 +1,8 @@
 [project]
-name = "dscb420_projekt"
+name = "prefect-dabi"
 version = "0.1.0"
-description = "Projektarbeit für DSCB420 - Datenanalyse und Business Intelligence 2 - SoSe2025"
-authors = [
-    { name = "Gruppe cool", email = "cool@h-ka.com" }, 
-]
+description = "Add your description here"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "prefect>3.0.0",
@@ -13,10 +11,6 @@ dependencies = [
     "prefect-sqlalchemy",
     "pandas",
     "numpy",
-    "scikit-learn",
-    "statsmodels",
-    "matplotlib",
-    "seaborn",
     "python-dotenv",
     "sqlalchemy",
     "psycopg2-binary",
@@ -24,23 +18,12 @@ dependencies = [
     "duckdb",
     "dbt-duckdb",
     "dbt-postgres",
-    "jupyterlab",
     "openpyxl",
-    "ipykernel",
-    "jupyter",
     "pydantic_settings",
     "pyarrow",
     "fastparquet",
     "PyYAML",
     "prefect-dbt>=0.7.0rc1",
     "minio>=7.2.15",
-    "confluent-kafka>=2.10.0",
     "prefect-aws>=0.5.10",
 ]
-
-[project.optional-dependencies]
-dev = [
-    "pytest",               
-    "ruff",                  
-]
-

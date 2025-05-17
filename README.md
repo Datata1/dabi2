@@ -83,20 +83,14 @@ uv run jupyter lab
 #### set up environment
 **When using windows you need to set up WSL and setup Docker Desktop to use WSL!**
 
-1. start docker-compose
+1. start docker compose
 ```sh
 make
 ```
 
-2. tear down docker-compose completly (when not developing on Docker images or compose we need to teardown volumes aswell sometimes)
+2. tear down docker compose completly (when not developing on Docker images or compose we need to teardown volumes aswell sometimes)
 ```sh
 make down
-```
-
-#### set up debezium connectors
-```sh
-curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" \
-localhost:8083/connectors/ -d @debezium-pg-connector.json
 ```
 
 #### change permissions for duckdb file when dbeaver cant connect to it
@@ -116,9 +110,7 @@ docker system prune -a -f --volumes
 - create a curated list of sources and tutorials about prefect and dbt on the Readme.md
 - create a curated list of useful commands (Linux)
 - refactor flows
-- refactor cdc_consumer
 - refactor run_worker
-- refactor dbt flow -> convert all time data to the same format in intermediate step! 
 - refactor confog setting flow: control every constant with prefect/config/setting.py and a .env file
 - add tests to dbt runs
 . create data marts for use-case

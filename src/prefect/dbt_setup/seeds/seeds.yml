@@ -4,6 +4,11 @@ version: 2
 seeds:
   
   - name: stg_raw_aisles
+    config:
+      strict_mode: false
+      quote: '"'  
+      escape: '"'
+      header: true
     description: "Initialer Seed für die Aisles."
     columns:
       - name: aisle_id
@@ -17,6 +22,11 @@ seeds:
       - name: _ts_ms
         data_type: BIGINT
   - name: stg_raw_departments
+    config:
+        strict_mode: false
+        quote: '"'
+        escape: '"'
+        header: true
     description: "Initialer Seed für die Departments."
     columns:
       - name: department_id
@@ -30,6 +40,11 @@ seeds:
       - name: _ts_ms
         data_type: BIGINT
   - name: stg_raw_products
+    config:
+      strict_mode: false
+      quote: '"'
+      escape: '"'
+      header: true
     description: "Initialer Seed für die Produkte."
     columns:
       - name: product_id
@@ -47,6 +62,11 @@ seeds:
       - name: _ts_ms
         data_type: BIGINT
   - name: stg_raw_users
+    config:
+      strict_mode: false
+      quote: '"'
+      escape: '"'
+      header: true
     description: "Initialer Seed für die User."
     columns:
       - name: user_id

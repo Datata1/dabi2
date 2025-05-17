@@ -7,7 +7,7 @@ from typing import List
 
 # --- Pfade ---
 APP_DIR = Path("/app")
-DBT_PROJECT_DIR = APP_DIR / "prefect" / "dbt_setup"
+DBT_PROJECT_DIR = APP_DIR / "dbt_setup"
 DBT_PROFILES_DIR = DBT_PROJECT_DIR # profiles.yml ist im Projektordner
 
 @task(name="Run dbt Command (PrefectDbtRunner)")

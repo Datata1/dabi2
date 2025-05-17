@@ -9,7 +9,7 @@ import time
 # --- Paths ---
 APP_DIR = Path("/app")
 DATA_DIR = APP_DIR / "data"
-DBT_SETUP_DIR = APP_DIR / "prefect" / "dbt_setup"
+DBT_SETUP_DIR = APP_DIR / "dbt_setup"
 ORDERS_PATH = DATA_DIR / "orders.parquet"
 TIPS_PATH = DATA_DIR / "tips_public.csv"
 ORDER_PRODUCTS_PATH = DATA_DIR / "order_products_denormalized.csv"

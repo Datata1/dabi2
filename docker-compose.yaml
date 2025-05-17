@@ -42,13 +42,22 @@ services:
   prefect-worker:
     container_name: prefect_worker_dabi2
     build:
-      context: . 
-      dockerfile: ./src/prefect/Dockerfile 
+      context: ./src/prefect 
+      dockerfile: Dockerfile
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          ignore: 
+            - .venv/
+        - action: rebuild
+          path: ./pyproject.toml 
     volumes:
-      - ./src/prefect:/app/prefect 
       - ./data:/app/data
-    working_dir: /app/prefect
-    command: "uv run python run_worker.py"
+      - ./src/prefect/dbt_setup:/app/dbt_setup
+    working_dir: /app
+    command: "uv run run_worker.py"
     environment:
       - PREFECT_API_URL=http://prefect:4200/api
       - DATABASE_URL_PREFECT=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:${DB_PORT}/${PREFECT_DB_NAME}
@@ -58,8 +67,8 @@ services:
       - PG_DWH_USER=${DB_USER:-datata1}
       - PG_DWH_PASSWORD=${DB_PASSWORD:-devpassword}
       - PG_DWH_DBNAME=${DB_NAME:-dwh_dabi}
-      - DBT_PROJECT_DIR=/app/prefect/dbt_setup
-      - DBT_PROFILES_DIR=/app/prefect/dbt_setup
+      - DBT_PROJECT_DIR=/app/dbt_setup
+      - DBT_PROFILES_DIR=/app/dbt_setup
       - MINIO_ROOT_PASSWORD=minio_secret_password
       - MINIO_ROOT_USER=minioadmin
     depends_on:
@@ -139,16 +148,6 @@ services:
         timeout: 5s
         retries: 5
 
-  # debezium-provisioner:
-  #   image: curlimages/curl:latest # Kleines Image mit curl
-  #   container_name: debezium_provisioner_dabi2
-  #   depends_on:
-  #     kafka-connect:
-  #       condition: service_healthy 
-  #   volumes:
-  #     - ./config/kafka-connect/debezium-pg-connector.json:/config/debezium-pg-connector.json:ro
-  #     - ./config/kafka-connect/provision_debezium.sh:/config/provision_debezium.sh:ro
-  #   command: ["/bin/sh", "/config/provision_debezium.sh"]
   
   akhq:
     image: tchiotludo/akhq:latest 
@@ -174,11 +173,20 @@ services:
 
   jupyter-lab:
     build:
-      context: . 
+      context: ./notebooks 
       dockerfile: Dockerfile 
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          ignore: 
+            - .venv/
+        - action: rebuild
+          path: ./pyproject.toml
     container_name: jupyter_lab_dabi2
     volumes:
-      - .:/app/
+      - ./notebooks:/app/
       - jupyter_config:/root/.jupyter           
       - jupyter_data:/root/.local/share/jupyter 
       - jupyter_cache:/root/.cache 
@@ -199,7 +207,7 @@ services:
         condition: service_healthy
       prefect: 
         condition: service_started
-    command: > # Multi-line für Lesbarkeit
+    command: > 
       uv run jupyter lab
       --ServerApp.base_url=/jupyter
       --ServerApp.token='dabi2'
@@ -231,26 +239,32 @@ services:
     
   cdc-lake-writer:
     build:
-      context: . # Oder spezifischer Pfad zum Dockerfile des Consumers
-      dockerfile: src/consumers/cdc_consumer/Dockerfile # Beispielpfad
+      context: ./src/consumers 
+      dockerfile: Dockerfile
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          ignore: 
+            - .venv/
+        - action: rebuild
+          path: ./pyproject.toml
     container_name: cdc_lake_writer_dabi2
     depends_on:
       kafka:
         condition: service_healthy
       minio:
-        condition: service_healthy # Sicherstellen, dass MinIO läuft
+        condition: service_healthy 
     environment:
-      # Verbindungen
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minio_secret_password # Aus .env oder Secrets holen!
-      - MINIO_BUCKET=datalake
-      # Kafka Konfiguration
-      - KAFKA_TOPIC_PATTERN=^cdc\.oltp_dabi\.public\.(.*) # Passe Prefix/Schema an
-      - CONSUMER_GROUP_ID=dabi2-minio-lake-writer-${HOSTNAME} # Eindeutige Group ID pro Instanz (optional)
+      - KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_BUCKET=${MINIO_BUCKET}
+      - KAFKA_TOPIC_PATTERN=${KAFKA_TOPIC_PATTERN} 
+      - CONSUMER_GROUP_ID=${CONSUMER_GROUP_ID} 
       - PREFECT_API_URL=http://prefect:4200/api
-      # - MINIO_USE_SSL=false # Falls nötig
     restart: unless-stopped
 
   caddy:
