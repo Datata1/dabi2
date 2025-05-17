@@ -33,23 +33,10 @@ Dieses Projekt dient als End-to-End-Beispiel für eine Datenplattform, die folge
 
 ## Architektur
 
-Die Plattform besteht aus mehreren miteinander verbundenen Services, die über Docker Compose verwaltet werden:
+### dbt
 
-[OLTP Datenbank (PostgreSQL)] --> [Debezium (Kafka Connect)] --> [Apache Kafka]
-|
-V
-[CDC Lake Writer (Python)] --> [MinIO Data Lake (Parquet)]
-|
-V (und/oder andere Quellen)
-[Prefect Worker] -- (führt dbt aus) --> [DuckDB Data Warehouse] &lt;-- [JupyterLab]
-^                                        ^                        ^
-|                                        |                        |
-[Prefect Server & UI]                     [AKHQ (Kafka UI)]        [MinIO UI]
-^                                        ^                        ^
-|                                        |                        |
-+-------------------- [Caddy Reverse Proxy] -----------------------+
-
-[ERSETZE DIES DURCH EIN VISUELLES DIAGRAMM, FALLS MÖGLICH/GEWÜNSCHT, z.B. mit Mermaid.js oder einem eingebetteten Bild]
+**DBT lineage graph**
+![dbt Projekt DAG](deliverables/dbt_dag.png)
 
 ## Features
 
@@ -208,4 +195,4 @@ docker system prune -a -f --volumes
 - refactor run_worker
 - refactor confog setting flow: control every constant with prefect/config/setting.py and a .env file
 - add tests to dbt runs
-. create data marts for use-case
+- create data marts for use-case
