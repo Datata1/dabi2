@@ -37,6 +37,10 @@ Dieses Projekt dient als End-to-End-Beispiel für eine Datenplattform, die folge
 ***Data Flow Chart***
 ![Data Flow Chart](deliverables/Dabi2.png)
 
+### OLTP 
+***ERM Diagram OLTP***
+![ERM Diagram](deliverables/dabi2-ERM.png)
+
 ### dbt
 **DBT lineage graph**
 ![dbt Projekt DAG](deliverables/dbt_dag.png)
