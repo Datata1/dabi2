@@ -24,12 +24,10 @@ Dieses Projekt dient als End-to-End-Beispiel für eine Datenplattform, die folge
 * **Change Data Capture (CDC):** Änderungen aus einer PostgreSQL-Datenbank (OLTP) werden in Echtzeit erfasst.
 * **Streaming:** Die erfassten Änderungen werden über einen Kafka-Message-Broker gestreamt.
 * **Data Lake Ingestion:** Ein Python-Consumer liest die CDC-Events von Kafka und schreibt sie als Parquet-Dateien in einen MinIO Data Lake.
-* **Data Warehousing:** dbt transformiert die Rohdaten aus dem Data Lake (oder direkt aus der OLTP-Quelle via Staging) und baut ein analytisches Data Warehouse in DuckDB auf.
+* **Data Warehousing:** dbt transformiert die Rohdaten aus dem Data Lake (oder direkt aus der OLTP-Quelle via Staging/Seeds) und baut ein analytisches Data Warehouse in DuckDB auf.
 * **Workflow Orchestrierung:** Prefect wird verwendet, um die verschiedenen Datenpipelines (z.B. dbt-Läufe, Consumer-Starts) zu orchestrieren und zu überwachen.
-* **Analyse & Exploration:** JupyterLab bietet eine interaktive Umgebung für Datenanalyse und -exploration auf Basis des DuckDB Data Warehouse und der Daten im Lake.
-* **Service-Zugriff:** Caddy dient als Reverse Proxy, um einen einfachen und sicheren Zugriff auf die Web-UIs der verschiedenen Dienste zu ermöglichen.
+* **Analyse & Exploration:** JupyterLab bietet eine interaktive Umgebung für Datenanalyse und -exploration auf Basis des DuckDB Data Warehouse
 
-[FÜGE HIER EINE KURZE BES tunnelling-PROBLEME ODER ZIELE DES PROJEKTS EIN, FALLS SPEZIFISCH]
 
 ## Architektur
 
@@ -42,8 +40,12 @@ Dieses Projekt dient als End-to-End-Beispiel für eine Datenplattform, die folge
 ![ERM Diagram](deliverables/dabi2-ERM.png)
 
 ### dbt
-**DBT lineage graph**
+***DBT lineage graph***
 ![dbt Projekt DAG](deliverables/dbt_dag.png)
+
+### Dwh
+***Star Schema***
+![Star Schema Dwh](deliverables/DWH_dagramm.png)
 
 ## Features
 
@@ -110,15 +112,15 @@ Dieses Projekt dient als End-to-End-Beispiel für eine Datenplattform, die folge
 
 ### Makefile Befehle
 
-Das `Makefile` stellt einige nützliche Befehle zur Verfügung:
+Das `Makefile` stellt einige Befehle zur Verfügung:
 
-* `make`: Führt `make setup` und dann `make up` aus (Standardziel).
+* `make`: Führt `make setup` und dann `make up`.
 * `make down`: Stoppt und entfernt alle Container. Optional werden auch Volumes entfernt (siehe Makefile für Details).
 
 
 ## Nutzung der Services
 
-Nachdem du `make start` oder `make up` ausgeführt hast, laufen die folgenden Services:
+Nachdem  `make start` oder `make up` ausgeführt wurde, laufen die folgenden Services:
 
 ### Datenfluss (vereinfacht)
 
@@ -143,8 +145,6 @@ Die Ports sind in `docker-compose.yaml` definiert. Wenn Caddy korrekt konfigurie
 * **PostgreSQL (Datenbankzugriff):** Host `localhost`, Port `5432`, Benutzer/Passwort/DB aus `.env`.
 * **DuckDB DWH:** Die Datei `dev.duckdb` befindet sich auf dem Host unter `./src/prefect/dbt_setup/dev.duckdb` und kann mit DBeaver oder anderen DuckDB-kompatiblen Tools geöffnet werden (am besten, wenn der `prefect-worker` nicht aktiv schreibt).
 
-[FÜLLE HIER DIE GENAUEN CADDY-PFADE AUS, WENN DU SIE HAST]
-
 ## Komponenten im Detail
 
 * **`db` (PostgreSQL/TimescaleDB):** Dient als OLTP-Quelldatenbank für CDC und als Backend-Datenbank für Prefect.
@@ -166,11 +166,11 @@ Die Datei `test_orders.py` deutet auf das Vorhandensein von Tests hin.
 
 ## Zukünftige Erweiterungen
 
-* [PLATZHALTER: z.B. Implementierung von Schema Registry für Kafka]
-* [PLATZHALTER: z.B. Ausbau der dbt-Tests und Datenqualitäts-Checks]
-* [PLATZHALTER: z.B. Integration eines BI-Tools wie Lightdash oder Superset]
-* [PLATZHALTER: z.B. Monitoring-Stack mit Prometheus/Grafana]
-* [PLATZHALTER: z.B. CI/CD-Pipeline für automatisierte Builds und Deployments]
+* Implementierung von Schema Registry für Kafka
+* Ausbau der dbt-Tests und Datenqualitäts-Checks
+* Integration eines BI-Tools wie Lightdash oder Superset
+* Monitoring-Stack mit Prometheus/Grafana
+* CI/CD-Pipeline für automatisierte Builds und Deployments
 
 ## Beitragende
 
@@ -203,3 +203,8 @@ docker system prune -a -f --volumes
 - refactor confog setting flow: control every constant with prefect/config/setting.py and a .env file
 - add tests to dbt runs
 - create data marts for use-case
+
+
+#### Fragen Zwischentermin
+1. brauchen Faktentabellen auch surrogate keys? (Also benötigt eine bestellung einen surrogate key) gerade ist in f_order_lines die order_id drin und kein sk (theoretisch könnten sich einträge für bestellungen ändern?)
+2. 
