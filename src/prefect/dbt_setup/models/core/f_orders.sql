@@ -12,7 +12,7 @@ WITH latest_orders AS (
     SELECT
         order_id,
         user_id,
-        order_timestamp, -- Der originale BIGINT (Mikrosekunden)
+        order_timestamp, 
         to_timestamp(order_timestamp / 1000000.0) AS order_timestamp_ts, -- Konvertiert zu TIMESTAMP
         tip_given,
         op_type,

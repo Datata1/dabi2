@@ -204,9 +204,11 @@ docker system prune -a -f --volumes
 - refactor run_worker
 - refactor confog setting flow: control every constant with prefect/config/setting.py and a .env file
 - add tests to dbt runs
-- create data marts for use-case
+- create data marts for use-case (probably done for 2a-2c)
+- remove caddy, its unessesary overhead we have now overview page on localhost:3001
 
 
 #### Fragen Zwischentermin
 1. brauchen Faktentabellen auch surrogate keys? (Also benötigt eine bestellung einen surrogate key) gerade ist in f_order_lines die order_id drin und kein sk (theoretisch könnten sich einträge für bestellungen ändern?)
 2. in fakten tabellen nur surrogate keys verwenden oder auch die ids?
+3. Frage zu tip_testdaten_template.csv: Was soll die erste spalte sein? Index, userid? die order_ids gibt es nicht

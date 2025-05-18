@@ -190,7 +190,8 @@ services:
       - jupyter_config:/root/.jupyter           
       - jupyter_data:/root/.local/share/jupyter 
       - jupyter_cache:/root/.cache
-      - ./src/prefect/dbt_setup:/dwh_data:ro 
+      - ./src/prefect/dbt_setup:/dwh_data:ro
+      - ./data:/data 
     ports:
       - "8888:8888" 
     working_dir: /app
