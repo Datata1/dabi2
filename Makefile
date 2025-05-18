@@ -40,4 +40,8 @@ sudo:
 	sudo chown $(id -u):$(id -g) ~/Documents/dabi2/src/prefect/dbt_setup/dev.duckdb
 	sudo chown $(id -u):$(id -g) ~/Documents/dabi2/.venv
 
-
+dbt-docs:
+	@echo ">>> Generiere dbt-Dokumentation..."
+	sudo chown -R $(id -u):$(id -g) src/prefect/dbt_setup
+	cd src/prefect && uv run dbt docs generate --project-dir ./dbt_setup/
+	cd src/prefect && uv run dbt docs serve --project-dir ./dbt_setup/ --port 8002

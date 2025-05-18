@@ -33,8 +33,11 @@ Dieses Projekt dient als End-to-End-Beispiel für eine Datenplattform, die folge
 
 ## Architektur
 
-### dbt
+### data flow
+***Data Flow Chart***
+![Data Flow Chart](deliverables/Dabi2.png)
 
+### dbt
 **DBT lineage graph**
 ![dbt Projekt DAG](deliverables/dbt_dag.png)
 
