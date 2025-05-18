@@ -1,5 +1,3 @@
-# src/prefect/tasks/debezium_tasks.py (oder wo immer du deine Tasks ablegst)
-
 import requests
 import time
 import json
@@ -50,7 +48,6 @@ def activate_debezium_connector_task(
     """
     logger = get_run_logger()
 
-    # 1. Auf Kafka Connect warten
     logger.info(f"Provisioner: Waiting for Kafka Connect at {connect_url}...")
     start_time = time.time()
     kafka_connect_ready = False
@@ -70,7 +67,6 @@ def activate_debezium_connector_task(
         logger.error(error_msg)
         raise RuntimeError(error_msg)
 
-    # 2. Prüfen, ob der Connector bereits existiert
     specific_connector_url = f"{connect_url}/{connector_name}"
     logger.info(f"Provisioner: Checking for existing connector '{connector_name}' at {specific_connector_url}...")
     
@@ -83,7 +79,6 @@ def activate_debezium_connector_task(
 
         elif response.status_code == 404:
             logger.info(f"Provisioner: Connector '{connector_name}' does not exist. Creating it...")
-            # 3. Connector erstellen
             post_response = requests.post(
                 connect_url, 
                 json=config_data, 

@@ -1,4 +1,3 @@
-# src/prefect/flows/initial_oltp_load_flow.py
 from pathlib import Path
 from prefect import flow, get_run_logger
 
@@ -22,10 +21,9 @@ def initial_oltp_load_flow():
     Liest Quelldateien und lädt dann Dimensions- und Faktentabellen in die OLTP DB
     mittels separater Tasks für bessere Sichtbarkeit im Graph.
     """
-    logger = get_run_logger() # Logger für den Flow
+    logger = get_run_logger() 
     logger.info("Starting multi-task OLTP load flow...")
 
-    # Debezium Connector Konfiguration
     debezium_connector_name = "oltp-postgres-connector"
     kafka_connect_url = "http://kafka-connect:8083/connectors"
     debezium_config_file = "/app/config/debezium-pg-connector.json" 
@@ -45,26 +43,22 @@ def initial_oltp_load_flow():
         config_file_path_str=debezium_config_file
     )
 
-    # Schritt 1: Lese alle Quelldateien
     schema_ok = create_oltp_schema()
     source_data = read_source_files(wait_for=[schema_ok])
     orders_df, tips_df, order_products_df = source_data
 
-    # Schritt 2: Lade Dimensionstabellen (hängt vom Lesen ab)
     dims_loaded_result = load_dimension_tables(
         orders_df=orders_df,
         order_products_df=order_products_df,
         wait_for=[source_data] 
     )
 
-    # activate dbezium
     debezium_activated = activate_debezium_connector_task(
         connector_name=debezium_connector_name,
         connect_url=kafka_connect_url,
         config_data=debezium_config_data_future
     )
 
-    # Schritt 3: Lade Faktentabellen (hängt vom Lesen ab)
     facts_loaded_result = load_fact_tables(
         orders_df_raw=orders_df,
         tips_df_raw=tips_df,

@@ -1,4 +1,5 @@
 import asyncio
+import asyncpg
 import sys
 import os
 import requests
@@ -20,8 +21,6 @@ from flows.dwh_pipeline import cdc_minio_to_duckdb_flow as target_flow
 from flows.initial_oltp_load_flow import initial_oltp_load_flow 
 from flows.debezium_activation_flow import activate_debezium_flow 
 
-# --- Hilfsfunktion für DB Check und DB Konfiguration (wie im vorherigen Schritt) ---
-import asyncpg
 DB_HOST = os.getenv("DB_HOST", "db")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "oltp")
@@ -32,7 +31,6 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "devpassword")
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# TODO: hole die konfigurationen aus .env oder utils.config.settings()
 # --- Block Konfiguration ---
 MINIO_BLOCK_NAME = "minio-credentials" 
 MINIO_ACCESS_KEY = os.environ.get("MINIO_ROOT_USER", "minioadmin") 
@@ -69,7 +67,6 @@ DEBEZIUM_TAGS = ["debezium", "activation"]
 DEBEZIUM_DESCRIPTION = "Start Debezium Connector"
 
 async def check_oltp_database_readiness(logger_param: logging.Logger) -> bool:
-    # ... (Implementierung von check_oltp_database_readiness wie zuvor gezeigt) ...
     logger_param.info("Checking OLTP database readiness for Debezium...")
     tables_to_check = ["aisles", "departments", "order_products", "orders", "products", "users"]
     conn = None
@@ -140,17 +137,15 @@ async def create_or_get_work_pool(client, name: str):
                      logger.error(f"Server Response (raw): {await e.response.text()}", file=sys.stderr)
             sys.exit(1)
 
-# --- NEUE FUNKTION zum Erstellen des Blocks ---
 async def create_or_get_minio_block(block_name: str, access_key: str, secret_key: str):
     """Prüft, ob ein MinIOCredentials Block existiert und erstellt ihn ggf. via .save()."""
     logger.info(f"\n--- Sicherstellen des MinIO Credentials Blocks: {block_name} ---")
 
     if not access_key or not secret_key:
         logger.error("FEHLER: MinIO Access Key oder Secret Key nicht konfiguriert (z.B. über Env Vars MINIO_ROOT_USER/MINIO_ROOT_PASSWORD). Überspringe Block-Erstellung.")
-        return None # Signalisiert, dass der Block nicht verfügbar ist
+        return None 
 
     try:
-        # 1. Versuchen, den Block mit der spezifischen Klasse zu laden
         loaded_block = await MinIOCredentials.load(block_name)
         logger.info(f"Block '{block_name}' vom Typ 'MinIOCredentials' existiert bereits.")
         return loaded_block
@@ -163,18 +158,16 @@ async def create_or_get_minio_block(block_name: str, access_key: str, secret_key
                     minio_root_user=access_key,
                     minio_root_password=secret_key
                 )
-                # 3. Block speichern
                 await minio_block.save(block_name, overwrite=False)
                 logger.info(f"Block '{block_name}' erfolgreich erstellt.")
-                return minio_block # Geben die neu erstellte Instanz zurück
+                return minio_block 
             except Exception as e_create:
                 logger.error(f"FEHLER beim Erstellen des Blocks '{block_name}' mit .save(): {e_create}", exc_info=True)
-                return None # Signalisiert Fehler
+                return None 
         else:
-            # Anderer ValueError beim Laden
             logger.error(f"Unerwarteter ValueError beim Laden des Blocks '{block_name}': {e}", exc_info=True)
             return None
-    except Exception as e_load: # Fängt andere Fehler beim Laden ab
+    except Exception as e_load: 
         logger.error(f"Unerwarteter Fehler beim Laden des Blocks '{block_name}': {e_load}", exc_info=True)
         return None
 
@@ -183,7 +176,6 @@ async def main():
     oltp_deployment_id_to_trigger = None
 
     async with get_client() as client:
-        # --- Work Pool sicherstellen ---
         await create_or_get_work_pool(client, WORK_POOL_NAME)
 
         minio_block = await create_or_get_minio_block(
@@ -195,18 +187,8 @@ async def main():
             logger.error("Abbruch aufgrund fehlenden/fehlerhaften MinIO Blocks.")
             sys.exit(1)
 
-        # --- Deployment 1: DWH Pipeline ---
         logger.info(f"\n--- Deploying DWH Flow: {DWH_DEPLOYMENT_NAME} ---")
         try:
-
-            # schedule_payload = [
-            #     {
-            #         "schedule": {
-            #             "interval": INTERVAL_SECONDS         
-            #         },
-            #         "max_scheduled_runs": 1,
-            #     }
-            # ]
             logger.info(f"Ermittle Flow ID für Funktion: {DWH_FLOW_FUNCTION_NAME}")
             dwh_flow_id = await client.create_flow_from_name(DWH_FLOW_FUNCTION_NAME)
             logger.info(f"Flow ID für DWH: {dwh_flow_id}")
@@ -223,10 +205,9 @@ async def main():
                     "path": str(APP_BASE_PATH),
                     "tags": DWH_TAGS,
                     "description": DWH_DESCRIPTION,
-                    # "schedules": schedule_payload,
                 },
                 headers={"Content-Type": "application/json"},
-                timeout=30 # Timeout hinzufügen
+                timeout=30 
             )
             dwh_deployment_response.raise_for_status() 
             dwh_deployment_data = dwh_deployment_response.json()
@@ -238,18 +219,14 @@ async def main():
         except requests.exceptions.RequestException as e:
             logger.error(f"FEHLER bei OLTP Deployment HTTP-Anfrage: {e}", file=sys.stderr)
             if hasattr(e, 'response') and e.response is not None: logger.info(f"Response Body: {e.response.text}", file=sys.stderr)
-            # sys.exit(1) # Ggf. abbrechen
         except Exception as e:
             logger.error(f"FEHLER beim Erstellen/Verarbeiten des OLTP Deployments: {e}", file=sys.stderr)
             traceback.logger.info_exc(file=sys.stderr)
-            # sys.exit(1) # Ggf. abbrechen
         
-        # --- Entscheidungspunkt: OLTP Load oder Debezium Aktivierung ---
         logger.info(f"\n--- Überprüfe OLTP-Datenbankstatus für Startaktion ---")
         db_is_populated = await check_oltp_database_readiness(logger)
         print(f"status: {db_is_populated}")
         
-        # --- Deployment 2: Initial OLTP Load ---
         logger.info(f"\n--- Deploying OLTP Initial Load Flow: {OLTP_DEPLOYMENT_NAME} ---")
         try:
             logger.info(f"Ermittle Flow ID für Funktion: {OLTP_FLOW_FUNCTION_NAME}")
@@ -274,7 +251,6 @@ async def main():
             )
             oltp_deployment_response.raise_for_status()
             oltp_deployment_data = oltp_deployment_response.json()
-            # Speichere die ID dieses Deployments für den Trigger
             oltp_deployment_id_to_trigger = oltp_deployment_data.get('id')
             if oltp_deployment_id_to_trigger:
                  logger.info(f"OLTP Deployment '{OLTP_DEPLOYMENT_NAME}' (ID: {oltp_deployment_id_to_trigger}) erfolgreich erstellt/aktualisiert.")
@@ -312,7 +288,6 @@ async def main():
             )
             debezium_deployment_response.raise_for_status()
             debezium_deployment_data = debezium_deployment_response.json()
-            # Speichere die ID dieses Deployments für den Trigger
             debezium_deployment_id_to_trigger = debezium_deployment_data.get('id')
             if debezium_deployment_id_to_trigger:
                  logger.info(f"debezium Deployment '{DEBEZIUM_DEPLOYMENT_NAME}' (ID: {debezium_deployment_id_to_trigger}) erfolgreich erstellt/aktualisiert.")
@@ -323,9 +298,8 @@ async def main():
             if hasattr(e, 'response') and e.response is not None: logger.info(f"Response Body: {e.response.text}", file=sys.stderr)
         except Exception as e:
             logger.error(f"FEHLER beim Erstellen/Verarbeiten des DWH Deployments: {e}", file=sys.stderr)
-            traceback.logger.info_exc(file=sys.stderr) # Gibt mehr Details aus
+            traceback.logger.info_exc(file=sys.stderr) 
 
-    # --- Initialen Flow Run für OLTP Load triggern ---
         if not db_is_populated: 
             try:
                 print(f"Triggere Flow Run für OLTP Deployment ID: {oltp_deployment_id_to_trigger}...")
@@ -350,7 +324,6 @@ async def main():
                 traceback.print_exc(file=sys.stderr)
 
     
-    # --- Worker starten ---
     logger.info(f"Starte Worker für Pool '{WORK_POOL_NAME}'...")
     try:
         worker = ProcessWorker(work_pool_name=WORK_POOL_NAME)

@@ -1,4 +1,3 @@
-# src/prefect/tasks/load_raw_data.py (Zurück zu DuckDB)
 import pandas as pd
 import duckdb 
 import os
@@ -6,7 +5,6 @@ from prefect import task, get_run_logger
 from pathlib import Path
 import time
 
-# --- Paths ---
 APP_DIR = Path("/app")
 DATA_DIR = APP_DIR / "data"
 DBT_SETUP_DIR = APP_DIR / "dbt_setup"
@@ -15,7 +13,6 @@ TIPS_PATH = DATA_DIR / "tips_public.csv"
 ORDER_PRODUCTS_PATH = DATA_DIR / "order_products_denormalized.csv"
 DUCKDB_PATH = DBT_SETUP_DIR / "dev.duckdb"
 
-# --- Config für Check ---
 TARGET_SCHEMA = "main" 
 RAW_TABLES_TO_CHECK = ["raw_orders", "raw_tips", "raw_order_products"]
 
@@ -33,7 +30,6 @@ def load_raw_data(
     logger = get_run_logger()
     logger.info(f"Checking if raw data load to DuckDB is needed...")
 
-    # --- Schritt 1: Existenz der Tabellen prüfen ---
     con = None
     skip_load = False
     try:
@@ -43,7 +39,6 @@ def load_raw_data(
         con = duckdb.connect(database=str(db_path.resolve()), read_only=False)
         logger.info("Connection successful. Checking tables...")
 
-        # Einfacher Weg: Versuche eine Abfrage auf information_schema
         query = f"""
         SELECT table_name
         FROM information_schema.tables
@@ -62,18 +57,16 @@ def load_raw_data(
 
     except Exception as e:
         logger.error(f"Error during database connection or table inspection: {e}", exc_info=True)
-        raise e # Fehler werfen
+        raise e 
     finally:
         if con:
             con.close()
             logger.info("Check connection closed.")
 
-    # --- Schritt 2: Laden überspringen oder durchführen ---
     if skip_load:
         logger.info("Raw data load task finished (skipped).")
         return True
 
-    # --- Wenn nicht übersprungen, führe den kompletten Ladevorgang aus ---
     logger.info(f"Starting full raw data load process to DuckDB: {db_path}")
     t_start = time.time()
     con = None
@@ -81,18 +74,15 @@ def load_raw_data(
         con = duckdb.connect(database=str(db_path.resolve()), read_only=False)
         logger.info("DuckDB connection for loading established.")
 
-        # --- Load Orders ---
         logger.info(f"Loading orders from: {orders_path}")
         if not orders_path.is_file(): raise FileNotFoundError(f"File not found: {orders_path}")
         orders_df = pd.read_parquet(orders_path)
         logger.info(f"Read {len(orders_df)} orders. Writing to 'raw_orders' (replace)...")
         con.sql(f"DROP TABLE IF EXISTS {TARGET_SCHEMA}.raw_orders;")
-        # DuckDB kann direkt aus Pandas DataFrames erstellen/einfügen
         con.sql(f"CREATE TABLE {TARGET_SCHEMA}.raw_orders AS SELECT * FROM orders_df;")
         count = con.sql(f'SELECT COUNT(*) FROM {TARGET_SCHEMA}.raw_orders').fetchone()[0]
         logger.info(f"Loaded {count} rows into raw_orders")
 
-        # --- Load Tips ---
         logger.info(f"Loading tips from: {tips_path}")
         if not tips_path.is_file(): raise FileNotFoundError(f"File not found: {tips_path}")
         tips_df = pd.read_csv(tips_path)
@@ -104,18 +94,14 @@ def load_raw_data(
         count = con.sql(f'SELECT COUNT(*) FROM {TARGET_SCHEMA}.raw_tips').fetchone()[0]
         logger.info(f"Loaded {count} rows into raw_tips")
 
-        # --- Load Order Products ---
         logger.info(f"Loading order products from: {order_products_path}")
         if not order_products_path.is_file(): raise FileNotFoundError(f"File not found: {order_products_path}")
         logger.info(f"Reading and writing order products (replace)...")
-        # DuckDB's CSV Reader ist oft schneller als Pandas für große Dateien
         con.sql(f"DROP TABLE IF EXISTS {TARGET_SCHEMA}.raw_order_products;")
-        # Spaltennamen beim Lesen anpassen und Typen erraten lassen
         con.sql(f"""
             CREATE TABLE {TARGET_SCHEMA}.raw_order_products AS
             SELECT * FROM read_csv_auto('{str(order_products_path.resolve())}', header=True, normalize_names=True);
         """)
-        # Optional: Spaltennamen nachträglich genau prüfen/anpassen falls normalize_names nicht reicht
         count = con.sql(f'SELECT COUNT(*) FROM {TARGET_SCHEMA}.raw_order_products').fetchone()[0]
         logger.info(f"Loaded {count} rows into raw_order_products using read_csv_auto.")
 

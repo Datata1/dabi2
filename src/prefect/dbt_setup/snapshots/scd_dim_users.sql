@@ -1,4 +1,3 @@
--- snapshots/scd_dim_users.sql (Korrigiert)
 {% snapshot dim_users %}
 
 {% set updated_at_column = 'effective_last_updated_ts' %} 

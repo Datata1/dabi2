@@ -1,12 +1,11 @@
-/* static/css/styles.css */
 body {
     font-family: sans-serif;
     display: flex;
-    flex-direction: column; /* Geändert für Linkliste */
+    flex-direction: column; 
     align-items: center;
-    min-height: 100vh; /* Geändert, um Scrollen zu ermöglichen, falls viele Links */
+    min-height: 100vh; 
     margin: 0;
-    padding-top: 2em; /* Etwas Platz oben */
+    padding-top: 2em; 
     background-color: #f4f4f9;
     color: #333;
     box-sizing: border-box;
@@ -19,7 +18,7 @@ body {
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     width: 80%;
-    max-width: 600px; /* Maximale Breite für die Link-Box */
+    max-width: 600px; 
 }
 
 h1 {

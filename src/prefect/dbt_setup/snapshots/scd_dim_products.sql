@@ -1,4 +1,3 @@
--- snapshots/scd_dim_products.sql (Mit bedingter Strategie)
 {% snapshot dim_products %}
 
 {% set updated_at_column = 'effective_last_updated_ts' %} 

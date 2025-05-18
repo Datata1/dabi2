@@ -1,4 +1,3 @@
--- models/intermediate/vw_product_snapshot_input.sql
 SELECT
     p_attr.user_id,  
     to_timestamp(

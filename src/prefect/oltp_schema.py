@@ -1,17 +1,14 @@
-# src/prefect/oltp_schema.py
 from sqlalchemy import (
     MetaData, Table, Column, Integer, BigInteger, String, DateTime,
     Boolean, ForeignKey, UniqueConstraint, Index, TEXT
 )
 
-# Ein MetaData-Objekt für dein OLTP-Schema
-oltp_metadata = MetaData(schema="public") # Optional: Schema hier angeben
+oltp_metadata = MetaData(schema="public") 
 
 # Tabellen-Definitionen (wie im vorherigen Post gezeigt)
 users_table = Table(
     "users", oltp_metadata,
     Column("user_id", BigInteger, primary_key=True, nullable=False),
-    # ... ggf. weitere Spalten ...
 )
 
 departments_table = Table(
@@ -51,5 +48,3 @@ order_products_table = Table(
     Column("product_id", BigInteger, ForeignKey("products.product_id"), primary_key=True),
     Column("add_to_cart_order", Integer),
 )
-
-# Füge hier alle weiteren Tabellen hinzu...

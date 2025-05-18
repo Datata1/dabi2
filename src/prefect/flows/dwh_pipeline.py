@@ -1,19 +1,16 @@
-# flows/dwh_pipeline.py
-
 import duckdb
 from datetime import datetime
 from minio import Minio
 from minio.error import S3Error
 from minio.commonconfig import CopySource
 from prefect import flow, task, get_run_logger
-from prefect_aws.credentials import MinIOCredentials # Bleibt gleich
+from prefect_aws.credentials import MinIOCredentials 
 from pathlib import Path
 import time
 
 from tasks.run_dbt_runner import run_dbt_command_runner
 
 # --- Konfiguration ---
-# (Bleibt unverändert)
 MINIO_BUCKET = "datalake"
 MINIO_SERVICE_NAME = "minio"
 MINIO_PORT = 9000
@@ -31,18 +28,15 @@ DBT_PROJECT_DIR = APP_DIR / "dbt_setup"
 DBT_PROFILES_DIR = DBT_PROJECT_DIR
 
 # --- Tasks ---
-
 @task(retries=1, retry_delay_seconds=5)
-def find_new_files_in_minio( # async entfernt
+def find_new_files_in_minio( 
     bucket: str,
     staging_prefix: str,
     minio_endpoint: str,
 ) -> list[str]:
     logger = get_run_logger()
     logger.info(f"--- Suche neue Dateien ---")
-    # ... (andere Logs bleiben gleich) ...
     try:
-        # await entfernt - Prefect Block.load() kann synchron aufgerufen werden
         minio_creds = MinIOCredentials.load(MINIO_BLOCK_NAME)
         logger.info(f"Block '{MINIO_BLOCK_NAME}' geladen.")
         client = Minio(
@@ -60,8 +54,7 @@ def find_new_files_in_minio( # async entfernt
     found_object_count = 0
     try:
         logger.info(f"Rufe client.list_objects(bucket='{bucket}', prefix='{staging_prefix}', recursive=True) auf...")
-        objects = client.list_objects(bucket, prefix=staging_prefix, recursive=True) # Minio client ist synchron
-        # ... (Rest der Logik bleibt gleich) ...
+        objects = client.list_objects(bucket, prefix=staging_prefix, recursive=True) 
         for obj in objects:
             found_object_count += 1
             if not obj.is_dir and (obj.object_name.endswith('.parquet') or obj.object_name.endswith('.jsonl')):
@@ -69,7 +62,6 @@ def find_new_files_in_minio( # async entfernt
                 new_files.append(full_path)
             else:
                 logger.info(f"    -> Objekt übersprungen (Verzeichnis oder falsche Endung).")
-        # ... (Rest der Logik bleibt gleich) ...
     except S3Error as e:
         logger.error(f"S3 Fehler beim Auflisten der Objekte: {e}")
         raise
@@ -79,7 +71,7 @@ def find_new_files_in_minio( # async entfernt
     return new_files
 
 @task()
-def load_files_to_duckdb_staging( # async entfernt
+def load_files_to_duckdb_staging( 
     files_to_process: list[str],
     duckdb_path: str,
     staging_table_prefix: str,
@@ -95,12 +87,9 @@ def load_files_to_duckdb_staging( # async entfernt
     loaded_tables = set()
 
     try:
-        # await entfernt
         minio_creds = MinIOCredentials.load(MINIO_BLOCK_NAME)
-        conn = duckdb.connect(duckdb_path, read_only=False) # DuckDB ist synchron
+        conn = duckdb.connect(duckdb_path, read_only=False) 
         logger.info(f"Verbunden mit DuckDB: {duckdb_path}")
-        # ... (Rest der Logik für S3-Konfiguration und Laden bleibt gleich, da DuckDB und String-Operationen synchron sind) ...
-        # DuckDB S3 Konfiguration
         conn.sql(f"INSTALL httpfs;")
         conn.sql(f"LOAD httpfs;")
         endpoint_host_port = minio_endpoint_for_duckdb.split('//')[-1]
@@ -111,7 +100,6 @@ def load_files_to_duckdb_staging( # async entfernt
         conn.sql(f"SET s3_url_style=true;")
 
         logger.info("DuckDB S3 Konfiguration gesetzt (Path Style).")
-        # ... (Rest der Dateiverarbeitungslogik bleibt gleich) ...
         processed_files_count = 0
         for i, file_path in enumerate(files_to_process):
             file_start_time = time.time()
@@ -140,7 +128,6 @@ def load_files_to_duckdb_staging( # async entfernt
                 if target_staging_table not in loaded_tables:
                     logger.info(f"Prüfe/Erstelle Tabelle {target_staging_table}...")
                     try:
-                        # logger.info(conn.execute(f"SELECT 1 FROM read_parquet('{file_path}') LIMIT 1;")) # Test optional
                         conn.sql(f"DROP TABLE IF EXISTS \"{target_staging_table}\";")
                         conn.sql(f"CREATE TABLE \"{target_staging_table}\" AS SELECT * FROM read_parquet('{file_path}') LIMIT 0;")
                         conn.sql(f"ALTER TABLE \"{target_staging_table}\" ADD COLUMN load_ts TIMESTAMPTZ DEFAULT now();")
@@ -165,7 +152,7 @@ def load_files_to_duckdb_staging( # async entfernt
                     insert_end_time = time.time()
 
 
-                    logger.info(f"INSERT für {file_path} erfolgreich. Dauer: {insert_end_time - insert_start_time:.2f}s") # rows_affected entfernt für Einfachheit
+                    logger.info(f"INSERT für {file_path} erfolgreich. Dauer: {insert_end_time - insert_start_time:.2f}s") 
                 except Exception as e_insert:
                     logger.info(f"Fehler beim INSERT ... SELECT *, now() für {file_path}: {e_insert}", exc_info=True)
                     continue
@@ -187,7 +174,7 @@ def load_files_to_duckdb_staging( # async entfernt
         raise
 
 @task(retries=1)
-def archive_processed_files( # async entfernt
+def archive_processed_files(
     processed_files: list[str],
     bucket: str,
     staging_prefix: str,
@@ -203,14 +190,13 @@ def archive_processed_files( # async entfernt
         archive_prefix += '/'
 
     try:
-        # await entfernt
         minio_creds = MinIOCredentials.load(MINIO_BLOCK_NAME)
         client = Minio(
             minio_endpoint,
             access_key=minio_creds.minio_root_user,
             secret_key=minio_creds.minio_root_password.get_secret_value(),
             secure=MINIO_USE_SSL,
-        ) # Minio client ist synchron
+        ) 
     except Exception as e:
         logger.error(f"Fehler beim Laden des Blocks '{MINIO_BLOCK_NAME}' oder Initialisieren des MinIO Clients für Archivierung: {e}", exc_info=True)
         raise
@@ -242,14 +228,13 @@ def archive_processed_files( # async entfernt
     logger.info(f"Archivierung abgeschlossen. {archived_count} Dateien verschoben, {error_count} Fehler.")
 
 # --- Der Haupt-Flow ---
-@flow(name="CDC MinIO to DWH (Synchronous)", log_prints=True) # Name angepasst
-def cdc_minio_to_duckdb_flow(): # Name angepasst für Klarheit
+@flow(name="CDC MinIO to DWH (Synchronous)", log_prints=True) 
+def cdc_minio_to_duckdb_flow():
     logger = get_run_logger()
     logger.info("Starte CDC MinIO zu DuckDB Flow (Synchronous)...")
     final_message = "Flow initialisiert."
 
     try:
-        # 1. Neue Dateien finden 
         new_files_list = find_new_files_in_minio(
             bucket=MINIO_BUCKET,
             staging_prefix=CDC_STAGING_PREFIX,
@@ -262,24 +247,19 @@ def cdc_minio_to_duckdb_flow(): # Name angepasst für Klarheit
 
         logger.info(f"Verarbeite {len(new_files_list)} neue Dateien.")
 
-        # 2. Daten in DuckDB Staging laden 
         load_staging_success = load_files_to_duckdb_staging(
             files_to_process=new_files_list,
             duckdb_path=DUCKDB_PATH,
             staging_table_prefix=STAGING_TABLE_PREFIX,
             minio_endpoint_for_duckdb=MINIO_DUCKDB_ENDPOINT,
         )
-        if not load_staging_success: # Task gibt True/False zurück
+        if not load_staging_success: 
             logger.error("Laden der Staging-Daten fehlgeschlagen. Breche Flow ab.")
             return "Laden der Staging-Daten fehlgeschlagen."
         logger.info("Daten erfolgreich in DuckDB Staging geladen.")
 
-        # 3. DBT sequentiell ausführen
-        logger.info("Triggering sequential DBT tasks...")
-
-        # 3.1 dbt debug (optional, await entfernt, falls es vorher da war)
         logger.info("Running DBT debug...")
-        debug_status = run_dbt_command_runner( # run_dbt_command_runner ist bereits synchron
+        debug_status = run_dbt_command_runner( 
             dbt_args=["debug"],
             project_dir=DBT_PROJECT_DIR,
             profiles_dir=DBT_PROFILES_DIR
@@ -289,7 +269,6 @@ def cdc_minio_to_duckdb_flow(): # Name angepasst für Klarheit
             return "DBT debug fehlgeschlagen."
         logger.info("DBT debug erfolgreich.")
 
-        # 3.2 Staging Models 
         logger.info("Running DBT Staging models...")
         staging_result = run_dbt_command_runner( 
             dbt_args=["build", "--resource-type", "model", "--resource-type", "snapshot"],
@@ -299,9 +278,8 @@ def cdc_minio_to_duckdb_flow(): # Name angepasst für Klarheit
         logger.info("DBT Staging Models abgeschlossen (Erfolg wird durch Task bestimmt).")
 
 
-        # 4. Dateien archivieren (await entfernt)
         logger.info("Alle DBT Schritte erfolgreich. Archiviere Dateien...")
-        archive_processed_files( # Kein await
+        archive_processed_files( 
              processed_files=new_files_list,
              bucket=MINIO_BUCKET,
              staging_prefix=CDC_STAGING_PREFIX,

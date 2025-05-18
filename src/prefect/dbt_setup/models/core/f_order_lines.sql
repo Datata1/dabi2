@@ -1,4 +1,3 @@
--- models/marts/f_order_lines.sql (Angepasst für CDC und Snapshots)
 {{
     config(
         materialized='incremental',
@@ -8,7 +7,6 @@
 }}
 
 WITH new_order_lines AS (
-    -- Wähle nur neue Einträge aus dem Staging-Modell
     SELECT *
     FROM {{ ref('stg_order_products') }}
     WHERE op_type = 'c' 
@@ -55,40 +53,32 @@ SELECT
     nol.order_id,
     nol.product_id, 
 
-    -- === WICHTIG: Surrogate Keys aus den Snapshots ===
-    sp.dbt_scd_id AS product_version_sk, -- Oder einen Hash von -1 wenn es ein Hash ist
-    su.dbt_scd_id AS user_version_sk,   -- Oder einen Hash von -1 wenn es ein Hash ist
-    dd.date_sk  AS order_date_sk, -- Das war schon korrekt
+    sp.dbt_scd_id AS product_version_sk, 
+    su.dbt_scd_id AS user_version_sk,   
+    dd.date_sk  AS order_date_sk, 
 
-    -- Kennzahlen
     nol.add_to_cart_order,
 
-    -- Metadaten (optional, aber nützlich)
     oi.order_timestamp,
     nol.staging_load_timestamp
 
 FROM new_order_lines nol
 INNER JOIN orders_info oi ON nol.order_id = oi.order_id
 
--- Join mit Produkt-Snapshot zum Zeitpunkt der Bestellung
 LEFT JOIN snapshot_products sp
     ON nol.product_id = sp.product_id
-    -- Vergleiche TIMESTAMP mit TIMESTAMP
-    AND oi.order_timestamp_ts >= sp.dbt_valid_from  -- sp.dbt_valid_from ist TIMESTAMP
+    AND oi.order_timestamp_ts >= sp.dbt_valid_from  
     AND oi.order_timestamp_ts < COALESCE(
-                                    sp.dbt_valid_to, -- ist TIMESTAMP
-                                    to_timestamp(4113387935) -- Fallback ist jetzt auch TIMESTAMP (entspricht 4113387935000000 / 1000000)
+                                    sp.dbt_valid_to, 
+                                    to_timestamp(4113387935) 
                                 )
 
--- Join mit User-Snapshot zum Zeitpunkt der Bestellung
 LEFT JOIN snapshot_users su
     ON oi.user_id = su.user_id
-    -- Vergleiche TIMESTAMP mit TIMESTAMP
-    AND oi.order_timestamp_ts >= su.dbt_valid_from -- su.dbt_valid_from ist TIMESTAMP
+    AND oi.order_timestamp_ts >= su.dbt_valid_from 
     AND oi.order_timestamp_ts < COALESCE(
-                                    su.dbt_valid_to, -- ist TIMESTAMP
-                                    to_timestamp(4113387935) -- Fallback ist jetzt auch TIMESTAMP
+                                    su.dbt_valid_to, 
+                                    to_timestamp(4113387935)
                                 )
 
--- Join mit Datum
 LEFT JOIN dim_date dd ON CAST(strftime(to_timestamp(oi.order_timestamp / 1000000), '%Y%m%d') AS INTEGER) = dd.date_sk

@@ -1,19 +1,15 @@
-# tasks/create_oltp_schema.py
 from sqlalchemy import create_engine
 import os
 from prefect import task, get_run_logger
 
-# Importiere das MetaData-Objekt aus deiner Schema-Datei
-# Passe den Import-Pfad ggf. an deine Struktur an (z.B. wenn schema.py in src/ liegt)
-from oltp_schema import oltp_metadata # Beispielhafter Import
+from oltp_schema import oltp_metadata 
 
-# --- OLTP DB Verbindungsdetails ---
 OLTP_HOST = os.getenv("OLTP_DB_HOST", "db")
 OLTP_PORT = os.getenv("OLTP_DB_PORT", "5432")
 OLTP_DBNAME = os.getenv("OLTP_DB_NAME", "oltp")
 OLTP_USER = os.getenv("OLTP_DB_USER", "datata1")
 OLTP_PASSWORD = "devpassword"
-TARGET_SCHEMA = "public" # Muss mit MetaData übereinstimmen oder None sein
+TARGET_SCHEMA = "public" 
 
 @task(name="Create OLTP Schema (if not exists)")
 def create_oltp_schema():
@@ -31,7 +27,6 @@ def create_oltp_schema():
         engine = create_engine(db_url)
         with engine.connect() as connection:
             logger.info(f"Connected to OLTP DB. Checking/Creating tables...")
-            # Erstellt nur Tabellen, die noch nicht existieren
             oltp_metadata.create_all(bind=engine, checkfirst=True)
             logger.info(f"Schema check/creation complete for schema '{TARGET_SCHEMA}'.")
             return True

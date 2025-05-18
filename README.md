@@ -198,14 +198,8 @@ docker system prune -a -f --volumes
 ```
 
 #### TODO:
-- reduce logs in general and create prefect artifacts wherever its useful
-- work on comments, just leave the important 
-- refactor flows
-- refactor run_worker
-- refactor confog setting flow: control every constant with prefect/config/setting.py and a .env file
 - add tests to dbt runs
-- create data marts for use-case (probably done for 2a-2c)
-- remove caddy, its unessesary overhead we have now overview page on localhost:3001
+- create data marts for use-case (probably done for 2a-2c, left for aufgabe 3)
 
 
 #### Fragen Zwischentermin

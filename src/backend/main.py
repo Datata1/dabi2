@@ -1,13 +1,12 @@
-# app/main.py
 import os
-import tempfile # Für temporäre Dateien
-from typing import List, Any, Dict # Für Typ-Annotationen
+import tempfile 
+from typing import List, Any, Dict 
 
 import uvicorn
 import duckdb
-from fastapi import FastAPI, Request, HTTPException, Path # Path für Pfadparameter-Validierung
+from fastapi import FastAPI, Request, HTTPException, Path 
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import HTMLResponse, FileResponse # FileResponse zum Senden von Dateien
+from fastapi.responses import HTMLResponse, FileResponse 
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field 

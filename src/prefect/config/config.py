@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from urllib.parse import quote_plus # Sicherstellen, dass Passwörter URL-safe sind
+from urllib.parse import quote_plus 
 
 class Settings(BaseSettings):
     DB_USER: str
