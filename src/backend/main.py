@@ -39,7 +39,6 @@ async def read_root(request: Request):
         {"name": "MinIO Konsole", "url": os.getenv("LINK_MINIO_CONSOLE", "http://localhost:9001"), "description": "Data Lake durchsuchen."},
         {"name": "AKHQ (Kafka UI)", "url": os.getenv("LINK_AKHQ_UI", "http://0.0.0.0:8080"), "description": "Kafka Topics inspizieren."},
         {"name": "JupyterLab", "url": os.getenv("LINK_JUPYTERLAB", "http://localhost:8888/jupyter"), "description": "Interaktive Datenanalyse."},
-        {"name": "Lightdash (BI)", "url": os.getenv("LINK_LIGHTDASH", "#"), "description": "Business Intelligence."},
         {"name": "API Dokumentation (Swagger)", "url": "/docs", "description": "Interaktive API-Dokumentation."},
         {"name": "Alternative API Dokumentation (ReDoc)", "url": "/redoc", "description": "Alternative API-Dokumentation."},
     ]
