@@ -10,4 +10,5 @@ dependencies = [
     "jupyterlab>=3.0.0",
     "ipykernel",
     "diagrams>=0.24.4",
+    "pyarrow>=20.0.0",
 ]

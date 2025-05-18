@@ -1,3 +1,5 @@
+notebooks/notebooks/parquet_files/*
+
 deliverables/*.aux
 deliverables/*.fdb_latexmk
 deliverables/*.fls

@@ -5,6 +5,7 @@
 Dieses Projekt implementiert eine Daten-Streaming- und Verarbeitungsplattform, die Change Data Capture (CDC) aus einer OLTP-Datenbank nutzt, Daten über Kafka streamt, in einem Data Lake (MinIO) ablegt, mit dbt und Prefect in einem DuckDB Data Warehouse transformiert und Analysen sowie Orchestrierung mit JupyterLab ermöglicht. Ein Caddy-Server fungiert als Reverse Proxy für die verschiedenen Web-UIs.
 
 Die Übersichtsseite ***http://localhost:3001*** bietet eine Linksammlung zu allen Tools auf die zugegriffen werden kann über den Browser
+![Linksammlung](deliverables/Overview.png)
 
 ## Inhaltsverzeichnis
 
