@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DABI2 Datenplattform - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Willkommen zur DABI2 Datenplattform!</h1>
+        <p>Dies ist die zentrale Startseite mit Links zu den verschiedenen Services.</p>
+
+        {% if links %}
+        <ul class="links-list">
+            {% for link in links %}
+            <li>
+                <a href="{{ link.url }}" target="_blank">{{ link.name }}</a>
+                {% if link.description %}
+                    <small style="display: block; margin-top: 0.3em; color: #555;">{{ link.description }}</small>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>Keine Links konfiguriert.</p>
+        {% endif %}
+
+        <p class="footer-note">
+            Die FastAPI-Dokumentation (Swagger UI) ist unter <a href="{{ url_for('swagger_ui_html') }}">/docs</a> und
+            ReDoc unter <a href="{{ url_for('redoc_html') }}">/redoc</a> verfügbar.
+        </p>
+    </div>
+</body>
+</html>

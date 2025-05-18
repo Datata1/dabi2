@@ -1,4 +1,4 @@
-# Projekt DBAI2
+# Projekt DABI2
 
 [![Docker Compose](https://img.shields.io/badge/Docker%20Compose-ready-blue.svg)](https://docs.docker.com/compose/)
 
@@ -195,7 +195,6 @@ docker system prune -a -f --volumes
 ```
 
 #### TODO:
-- draw architecture charts (ERM, star-schema, dataflow chart)
 - reduce logs in general and create prefect artifacts wherever its useful
 - work on comments, just leave the important 
 - refactor flows
@@ -207,4 +206,4 @@ docker system prune -a -f --volumes
 
 #### Fragen Zwischentermin
 1. brauchen Faktentabellen auch surrogate keys? (Also benötigt eine bestellung einen surrogate key) gerade ist in f_order_lines die order_id drin und kein sk (theoretisch könnten sich einträge für bestellungen ändern?)
-2. 
+2. in fakten tabellen nur surrogate keys verwenden oder auch die ids?

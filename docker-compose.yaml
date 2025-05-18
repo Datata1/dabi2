@@ -189,7 +189,8 @@ services:
       - ./notebooks:/app/
       - jupyter_config:/root/.jupyter           
       - jupyter_data:/root/.local/share/jupyter 
-      - jupyter_cache:/root/.cache 
+      - jupyter_cache:/root/.cache
+      - ./src/prefect/dbt_setup:/dwh_data:ro 
     ports:
       - "8888:8888" 
     working_dir: /app
@@ -200,7 +201,8 @@ services:
       - OLTP_DB_PASSWORD=${DB_PASSWORD:-devpassword}
       - OLTP_DB_NAME=${DB_NAME:-oltp}
       - PREFECT_API_URL=http://prefect:4200/api
-      - DUCK_DWH_PATH=/app/data/dev.duckdb
+      - DUCKDB_DWH_PATH=/dwh_data/dev.duckdb
+
     restart: unless-stopped
     depends_on:
       db: 
@@ -281,7 +283,33 @@ services:
       - prefect
       - jupyter-lab 
       - minio
-
+    
+  fastapi-backend-dabi2:
+    build:
+      context: ./src/backend 
+      dockerfile: Dockerfile
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          ignore: 
+            - .venv/
+        - action: rebuild
+          path: ./pyproject.toml
+    volumes:
+      - ./src/prefect/dbt_setup:/dwh_data:ro 
+    container_name: fastapi-backend-dabi2
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy 
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - DUCKDB_DWH_PATH=/dwh_data/dev.duckdb
 # --- Benannte Volumes für persistente Daten ---
 volumes:
   postgres_data:

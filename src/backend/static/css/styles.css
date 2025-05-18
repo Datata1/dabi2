@@ -1,0 +1,58 @@
+/* static/css/styles.css */
+body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column; /* Geändert für Linkliste */
+    align-items: center;
+    min-height: 100vh; /* Geändert, um Scrollen zu ermöglichen, falls viele Links */
+    margin: 0;
+    padding-top: 2em; /* Etwas Platz oben */
+    background-color: #f4f4f9;
+    color: #333;
+    box-sizing: border-box;
+}
+
+.container {
+    text-align: center;
+    padding: 2em;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    width: 80%;
+    max-width: 600px; /* Maximale Breite für die Link-Box */
+}
+
+h1 {
+    color: #007bff;
+    margin-bottom: 1em;
+}
+
+.links-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.links-list li {
+    margin-bottom: 1em;
+}
+
+.links-list a {
+    display: block;
+    padding: 0.8em 1.5em;
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.links-list a:hover {
+    background-color: #0056b3;
+}
+
+.footer-note {
+    margin-top: 2em;
+    font-size: 0.9em;
+    color: #666;
+}

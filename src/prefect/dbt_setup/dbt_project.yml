@@ -1,6 +1,7 @@
 
 name: 'dbt_setup'
 version: '1.0.0'
+config-version: 2
 
 profile: 'dbt_setup'
 model-paths: ["models"]
@@ -10,9 +11,18 @@ seed-paths: ["seeds"]
 macro-paths: ["macros"]
 snapshot-paths: ["snapshots"]
 
-clean-targets:        
+clean-targets:
   - "target"
   - "dbt_packages"
+
+models:
+  dbt_setup: 
+    core: 
+      +materialized: table
+
+    marts: 
+      +materialized: table
+      +schema: analytics_marts
 
 seeds:
   dbt_setup: 
