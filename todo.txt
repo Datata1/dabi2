@@ -1,6 +1,0 @@
-VOR ABGABE:
-- python flows für ml
-
-
-- laptop aufsetzen für live demo -> oltp simulation + python validation
-- Folien bearbeiten für präsi
