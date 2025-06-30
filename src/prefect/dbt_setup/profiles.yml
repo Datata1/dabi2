@@ -5,7 +5,7 @@ dbt_setup:
     dev_clickhouse:
       type: clickhouse
       schema: default 
-      host: localhost 
+      host: clickhouse-server 
       port: 8123
       user: default
       password: "devpassword" 

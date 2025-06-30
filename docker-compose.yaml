@@ -54,7 +54,6 @@ services:
         - action: rebuild
           path: ./pyproject.toml 
     volumes:
-      - ./src/prefect:/app
       - ./data:/app/data
       - ./src/prefect/dbt_setup:/app/dbt_setup
     working_dir: /app

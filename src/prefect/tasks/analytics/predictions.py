@@ -60,7 +60,7 @@ def make_predictions(
 
     return df_final
 
-@task(name="make predictions")
+@task(name="make final predictions") # Task-Namen angepasst, um Konflikte zu vermeiden
 def make_final_predictions(
     data_frame: pd.DataFrame,
     trained_model: LogisticRegressionCV,
@@ -68,13 +68,24 @@ def make_final_predictions(
     lags: int,
     min_date_from_training: pd.Timestamp
 ) -> pd.DataFrame:
+    logger = get_run_logger()
 
+    # Erstelle eine Kopie des data_frame, um unerwünschte Nebeneffekte zu vermeiden,
+    # falls feature_engineering den Index des Originals beeinflusst.
     data_frame_features = feature_engineering(
-        data_frame,
+        data_frame.copy(),
         lags,
         min_date_global=min_date_from_training
     )
 
+    # Filtern nach Zeilen, bei denen das Ziel (tip) NaN ist
+    data_frame_features = data_frame_features[data_frame_features.is_target_nan == True]
+
+    # Die 'tip'-Spalte entfernen, wenn sie existiert und nicht für die Feature-Auswahl benötigt wird
+    if "tip" in data_frame_features.columns:
+        data_frame_features.drop(columns=["tip"], inplace=True)
+
+    # Definition der Features für die Vorhersage
     categorical_features = ["order_contains_organic", "is_holiday", "cluster"]
     numerical_features_to_scale = ["avg_no_prod", "overall_tip_proba",
                                    "tip_proba_per_hour", "tip_proba_per_weekday",
@@ -84,10 +95,7 @@ def make_final_predictions(
     shifted_features = [f"tip_t-{lag}" for lag in range(1, lags + 1)]
     temporal_features = ["weekday"]
 
-    data_frame_features = data_frame_features[data_frame_features.is_target_nan == True]
-
-    data_frame_features.drop(columns=["tip"], inplace=True)
-
+    # Auswahl der Features und Entfernen von Zeilen mit NaN-Werten in diesen Features.
     features_for_pred = data_frame_features[
         categorical_features +
         numerical_features_to_scale +
@@ -97,21 +105,42 @@ def make_final_predictions(
         shifted_features
     ].dropna()
 
+    # Transformation der Features mit dem trainierten Preprocessor
     X_transformed = trained_preprocessor.transform(features_for_pred)
 
+    # Vorhersagen treffen
     predictions = trained_model.predict(X_transformed)
 
-    data_frame["prediction"] = np.nan
+    # Erstelle eine Arbeitskopie des ursprünglichen data_frame für die Zuweisung der Vorhersagen
+    df_result = data_frame.copy()
+    df_result["prediction"] = np.nan # Initialisiere die 'prediction'-Spalte mit NaN
 
-    data_frame.loc[features_for_pred.index, "prediction"] = predictions
+    # Erstelle eine Pandas Series der Vorhersagen mit dem Index von features_for_pred.
+    predictions_series = pd.Series(predictions, index=features_for_pred.index)
 
-    df_final = data_frame[data_frame.tip.isna()][["order_id", "prediction"]].reset_index(drop=True)
+    # Überprüfe, ob alle Indizes aus predictions_series im df_result vorhanden sind.
+    missing_indices_in_df_result = predictions_series.index.difference(df_result.index)
+    if not missing_indices_in_df_result.empty:
+        logger.warning(
+            f"Warnung: Einige Indizes aus den Vorhersagen ({missing_indices_in_df_result.tolist()}) "
+            f"wurden nicht im ursprünglichen data_frame gefunden. Sie werden bei der Zuweisung übersprungen."
+        )
+        predictions_series = predictions_series[predictions_series.index.isin(df_result.index)]
 
+    # Weise die Vorhersagen der 'prediction'-Spalte im df_result zu.
+    df_result.loc[predictions_series.index, "prediction"] = predictions_series
+
+    # Filtere die finalen Ergebnisse: nur Zeilen, bei denen 'tip' ursprünglich NaN war
+    df_final = df_result[df_result.tip.isna()][["order_id", "prediction"]].reset_index(drop=True)
+
+    # Überprüfung auf NaN-Werte in den finalen Vorhersagen
     if df_final.prediction.isna().values.any():
-        raise ValueError("Predictions contain NaN values! Check preprocessing or input data completeness.")
+        logger.error("Vorhersagen enthalten NaN-Werte nach der Zuweisung! Dies deutet auf fehlende Vorhersagen für einige Zielzeilen hin.")
+        raise ValueError("Vorhersagen enthalten NaN-Werte! Überprüfe die Vorverarbeitung oder die Vollständigkeit der Eingabedaten.")
 
+    # Konvertiere Vorhersagen in den booleschen Typ
     df_final["prediction"] = df_final.prediction.astype(bool)
-
     df_final.rename(columns={"prediction": "tip"}, inplace=True)
 
+    gc.collect() # Speicherbereinigung
     return df_final

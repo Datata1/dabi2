@@ -19,9 +19,9 @@ DB_USER = os.getenv("DB_USER", "datata1")
 DB_PASS = os.getenv("DB_PASS", "devpassword")
 
 # --- Hardcodierte IDs für die Demo-ÄNDERUNGEN ---
-PRODUCTS_TO_RENAME = {35708: "Chocolate Coconut Chew Flavored Bar TEST 23324214", 49302: "Bulgarian Yogurt TEST"}
-DEPARTMENTS_TO_RENAME = {1: "frozen TEST", 16: "dairy eggs TEST", 19: "snack TEST"}
-AISLES_TO_RENAME = {3: "energy granola bars TEST", 4: "instant food TEST"}
+PRODUCTS_TO_RENAME = {35708: "Chocolate Coconut Chew Flavored Bar dabi rockt", 49302: "Bulgarian Yogurt asd"}
+DEPARTMENTS_TO_RENAME = {1: "frozen sa", 16: "dairy eggs asdad", 19: "snack asd"}
+AISLES_TO_RENAME = {3: "energy granola bars sind legga", 4: "instant food asd"}
 USER_IDS_FOR_DEMO = [7309, 1167, 12544, 23955, 42392, 55114, 67431, 888, 9997, 103]
 ORDER_COUNT = 100
 
@@ -151,8 +151,6 @@ def run_demo_scenario():
     finally:
         if connection:
             connection.close()
-            console.print("\n[yellow]ℹ️  Datenbankverbindung wurde geschlossen.[/yellow]")
-
 if __name__ == "__main__":
     # Bevor Sie das Skript ausführen, stellen Sie sicher, dass 'rich' installiert ist:
     # pip install rich
