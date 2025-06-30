@@ -5,10 +5,16 @@ import gc
 from typing import Tuple, Optional, Union
 from prefect import task, get_run_logger
 
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, FunctionTransformer, MinMaxScaler
 from sklearn.linear_model import LogisticRegressionCV, LinearRegression
-from sklearn.compose import ColumnTransformer
-from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.model_selection import train_test_split, TimeSeriesSplit
 from sklearn.metrics import f1_score, accuracy_score, r2_score
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sklearn.cluster import KMeans
 
 
 from sklearn.model_selection import train_test_split, TimeSeriesSplit
@@ -132,6 +138,116 @@ def train_prediction_model(df_input: pd.DataFrame, lags: int) -> Tuple[LogisticR
     final_model_for_pred = LogisticRegressionCV(cv=5, n_jobs=-1, max_iter=1000)
     final_model_for_pred.fit(X_processed_transformed, y)
     #logger.info("Model training finished successfully", "bullet", 1)
+
+    del X_processed_transformed
+    gc.collect()
+
+    return final_model_for_pred, final_preprocessor_for_pred, min_date_for_pred, acc_mean
+
+
+@task()
+def train_final_prediction_model(df_input: pd.DataFrame, lags: int, log_print: bool = True) -> Tuple[LogisticRegressionCV, ColumnTransformer, pd.Timestamp, float]:
+
+    df_cleaned_for_training = df_input[~df_input["is_target_nan"]].copy()
+
+    min_date_for_pred = df_input.order_date.min()
+
+    del df_input
+    gc.collect()
+
+    df_cleaned_for_training.set_index("order_date", inplace=True)
+
+    y = df_cleaned_for_training.pop("tip")
+
+    categorical_features = ["order_contains_organic", "is_holiday", "cluster"]
+    numerical_features_to_scale = ["avg_no_prod", "overall_tip_proba",
+                                   "tip_proba_per_hour", "tip_proba_per_weekday",
+                                   "tip_proba_per_department"] + ["days_since_start"]
+    numerical_features_to_minmax = ["no_orders", "cart_size"]
+    numerical_features_passthrough = [f"tip_t-{lag}_is_nan" for lag in range(1, lags + 1)]
+    shifted_features = [f"tip_t-{lag}" for lag in range(1, lags + 1)]
+    temporal_features = ["weekday"]
+
+    X_processed = df_cleaned_for_training[categorical_features + numerical_features_to_scale + numerical_features_passthrough + temporal_features + shifted_features + ["no_orders", "cart_size"]]
+
+    del df_cleaned_for_training
+    gc.collect()
+
+    fold_acc_scores = []
+    tscv = TimeSeriesSplit(n_splits=3)
+    for i, (train_idx, test_idx) in enumerate(tscv.split(X_processed)):
+        #_log_print(log_print, f"Current fold: {i + 1}", "header", newline="start")
+        X_train, X_test = X_processed.iloc[train_idx], X_processed.iloc[test_idx]
+        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+        del train_idx, test_idx
+        gc.collect()
+
+        #_log_print(log_print, "Preprocessing", "bullet", 1)
+        current_preprocessor = ColumnTransformer(
+            transformers=[
+                ("imputation", SimpleImputer(strategy="most_frequent"), shifted_features),
+                ("nan_indicators", "passthrough", numerical_features_passthrough),
+                ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_features),
+                ("num", StandardScaler(), numerical_features_to_scale),
+                ("no", MinMaxScaler(), numerical_features_to_minmax),
+                ("weekly", SinCosTransformer(period=7), ["weekday"])
+            ], remainder="drop"
+        )
+        current_preprocessor.fit(X_train)
+
+        X_train_transformed = current_preprocessor.transform(X_train)
+        X_test_transformed = current_preprocessor.transform(X_test)
+
+        del current_preprocessor, X_train, X_test
+        gc.collect()
+
+        #_log_print(log_print, "Training", "bullet", 1)
+        current_model = LogisticRegressionCV(cv=3, n_jobs=-1, max_iter=1000)
+        current_model.fit(X_train_transformed, y_train)
+
+        del X_train_transformed, y_train
+        gc.collect()
+
+        #_log_print(log_print, "Testing", "bullet", 1)
+        y_pred = current_model.predict(X_test_transformed)
+        accuracy = accuracy_score(y_test, y_pred)
+
+        #_log_print(log_print, f"Accuracy Fold {i + 1}: {accuracy}", "text", 1)
+
+        del X_test_transformed, y_pred, current_model, y_test
+        gc.collect()
+
+        fold_acc_scores.append(accuracy)
+
+    del tscv
+    gc.collect()
+
+    acc_mean = np.mean(fold_acc_scores)
+
+    #_log_print(log_print, "Finally", "header", newline="start")
+    #_log_print(log_print, "Preprocessing", "bullet", 1)
+    final_preprocessor_for_pred = ColumnTransformer(
+        transformers=[
+            ("imputation", SimpleImputer(strategy="most_frequent"), shifted_features),
+            ("nan_indicators", "passthrough", numerical_features_passthrough),
+            ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_features),
+            ("num", StandardScaler(), numerical_features_to_scale),
+            ("no", MinMaxScaler(), numerical_features_to_minmax),
+            ("weekly", SinCosTransformer(period=7), ["weekday"])
+        ], remainder="drop"
+    )
+    final_preprocessor_for_pred.fit(X_processed)
+
+    X_processed_transformed = final_preprocessor_for_pred.transform(X_processed)
+
+    del X_processed
+    gc.collect()
+
+    #_log_print(log_print, "Training", "bullet", 1)
+    final_model_for_pred = LogisticRegressionCV(cv=3, n_jobs=-1, max_iter=1000)
+    final_model_for_pred.fit(X_processed_transformed, y)
+    #_log_print(log_print, "Model training finished successfully", "bullet", 1)
 
     del X_processed_transformed
     gc.collect()

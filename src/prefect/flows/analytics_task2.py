@@ -4,7 +4,6 @@ import clickhouse_connect
 
 # task imports
 from tasks.analytics.load_data_clickhouse import process_data_from_csv
-from tasks.analytics.trend_bereinigung import remove_trends_and_seasons
 from tasks.analytics.feature_engineering import feature_engineering
 from tasks.analytics.predictions import make_predictions
 from tasks.analytics.model_training import train_prediction_model
@@ -22,7 +21,7 @@ CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "devpassword")
 
 @flow(name="Analytics Flow")
 def analytics2():
-    pass
+
     logger = get_run_logger()
     logger.info("Starting analytics flow...")
 
@@ -34,7 +33,7 @@ def analytics2():
 
     # 2.
     # trend bereinigung und saison bereinigung
-    df = remove_trends_and_seasons(df=orders_tips, lags=4, min_date_global=orders_tips.order_date.min())
+    df = feature_engineering(df=orders_tips, lags=4, min_date_global=orders_tips.order_date.min())
 
     # 4.
     # modell training

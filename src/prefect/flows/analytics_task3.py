@@ -7,9 +7,9 @@ from tasks.analytics.load_data_clickhouse import process_data_from_csv
 from tasks.analytics.trend_bereinigung import remove_trends_and_seasons
 from tasks.analytics.feature_engineering import feature_engineering
 from tasks.analytics.predictions import make_predictions
-from tasks.analytics.model_training import train_prediction_model
+from tasks.analytics.model_training import train_prediction_model, train_final_prediction_model
 from tasks.analytics.model_evaluation import print_model_evaluation
-from tasks.analytics.predictions import make_predictions
+from tasks.analytics.predictions import make_final_predictions
 
 # utils imports
 
@@ -21,38 +21,29 @@ CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "devpassword")
 
 @flow(name="Analytics Flow")
 def analytics3():
-    pass
-    # logger = get_run_logger()
-    # logger.info("Starting analytics flow...")
+    
+    logger = get_run_logger()
+    logger.info("Starting analytics flow...")
 
-    # # 1.
-    # # load data (either csv or clickhouse is fine)
-    # df = load_data_clickhouse(
-    #     host=CLICKHOUSE_HOST,
-    #     port=CLICKHOUSE_PORT,
-    #     user=CLICKHOUSE_USER,
-    #     password=CLICKHOUSE_PASSWORD
-    # )
+    tips, orders_tips, tip_temp_test = process_data_from_csv()
 
-    # # 2.
-    # # trend bereinigung und saison bereinigung
-    # df = remove_trends_and_seasons(df)
+    logger.info(orders_tips.head())
 
-    # # 3.
-    # # feature engineering
-    # df = feature_engineering(df)
+    df = feature_engineering(df=orders_tips, lags=4, min_date_global=orders_tips.order_date.min())
 
-    # # 4.
-    # # modell training
-    # # -> save model?
-    # model = train_prediction_model(df)
 
-    # # 5. evaluation
-    # # show metrics
-    # print_model_evaluation(model)
+    final_model_for_pred, final_preprocessor_for_pred, min_date_for_pred, acc_mean = train_final_prediction_model(df_input=df, lags=4)
 
-    # # 6. prediction 
-    # # make predictions on csv data set and save predictions to csv
-    # predictions = make_predictions(model, df)
-    # logger.info("Analytics flow completed successfully.")
 
+    predictions = make_final_predictions(
+        data_frame=tip_temp_test,
+        trained_model=final_model_for_pred,
+        trained_preprocessor=final_preprocessor_for_pred,
+        lags=4,
+        min_date_from_training=min_date_for_pred
+    )
+
+    predictions.to_csv("/app/data/task_3g_pred.csv")
+
+
+    logger.info("Analytics flow completed successfully.")
