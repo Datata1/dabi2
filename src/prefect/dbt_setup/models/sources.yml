@@ -4,7 +4,7 @@ sources:
   - name: cdc_staging  
     description: "Rohe CDC Events, die vom Prefect Flow aus MinIO in DuckDB geladen wurden."
 
-    schema: main 
+    schema: default 
 
     tables:
       - name: aisles  

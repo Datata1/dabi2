@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: cdc_raw_data
+    description: "Rohtabellen, die aus den Seeds und dem CDC-Prozess befüllt werden."
+    database: default_raw_seeds 
+    tables:
+      - name: stg_raw_aisles
+      - name: stg_raw_departments
+      - name: stg_raw_products
+      - name: stg_raw_users
+      - name: stg_raw_orders
+      - name: stg_raw_order_products

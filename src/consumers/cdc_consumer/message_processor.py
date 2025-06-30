@@ -28,7 +28,7 @@ def transform_payloads_to_dataframe(payloads: list, topic_name: str) -> pd.DataF
         actual_op = record_data.pop('__op', None)
         actual_ts_ms = record_data.pop('__ts_ms', None)
         record_data.pop('__deleted', None) 
-        record_data.pop('__source_ts_ms', None) 
+        # record_data.pop('__source_ts_ms', None) 
         record_data.pop('__table', None)
 
         # Eigene Metadaten hinzufügen
@@ -51,8 +51,10 @@ def transform_payloads_to_dataframe(payloads: list, topic_name: str) -> pd.DataF
 
 
     # Typkonvertierungen für fehlende Werte
-    if '_source_ts_ms' in df.columns:
-        df['_ts_ms'] = pd.to_numeric(df['_source_ts_ms'], errors='coerce').astype(pd.Int64Dtype())
+    if '_ts_ms' in df.columns:
+        df['_ts_ms'] = pd.to_numeric(df['_ts_ms'], errors='coerce').astype(pd.Int64Dtype())
+    else:
+        df['_ts_ms'] = pd.Series(dtype=pd.Int64Dtype())
     if '_op' in df.columns:
         df['_op'] = df['_op'].astype(str) 
 

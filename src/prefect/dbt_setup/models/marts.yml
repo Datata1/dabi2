@@ -1,0 +1,12 @@
+# basic test
+version: 2
+
+models:
+  - name: dim_users
+    description: "Dimensionstabelle mit Kundendaten."
+    columns:
+      - name: user_id
+        description: "Der Primärschlüssel für einen Kunden."
+        tests:
+          - unique      
+          - not_null      

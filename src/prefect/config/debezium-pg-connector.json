@@ -15,7 +15,7 @@
       "plugin.name": "pgoutput",
       "publication.autocreate.mode": "filtered",
       "slot.drop.on.stop": "false",
-      "snapshot.mode": "never",
+      "snapshot.mode": "initial",
       "decimal.handling.mode": "double",
       "transforms": "unwrap",
       "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",

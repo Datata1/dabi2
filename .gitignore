@@ -13,3 +13,8 @@ __pycache__/
 
 dev.duckdb
 dev.duckdb.wal
+
+/deliverables/*.bcf
+/deliverables/*.out
+/deliverables/*run.xml
+/deliverables/*.toc

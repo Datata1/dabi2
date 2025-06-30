@@ -26,4 +26,7 @@ dependencies = [
     "prefect-dbt>=0.7.0rc1",
     "minio>=7.2.15",
     "prefect-aws>=0.5.10",
+    "dbt-clickhouse>=1.9.2",
+    "clickhouse-connect>=0.8.18",
+    "faker>=37.4.0",
 ]

@@ -1,4 +1,3 @@
-
 name: 'dbt_setup'
 version: '1.0.0'
 config-version: 2
@@ -16,35 +15,48 @@ clean-targets:
   - "dbt_packages"
 
 models:
-  dbt_setup: 
-    core: 
-      +materialized: table
+  dbt_setup:
+    +database: default
+    +materialized: view 
 
-    marts: 
+    staging:
+      +schema: staging 
+
+    intermediate:
       +materialized: table
-      +schema: analytics_marts
+      +schema: intermediate
+
+    marts:
+      +materialized: incremental
+      +schema: marts 
+
+snapshots:
+  dbt_setup:
+    +database: default
+    +target_schema: default_marts
+
 
 seeds:
-  dbt_setup: 
+  dbt_setup:
+    +database: default
+    +schema: raw_seeds 
+
     stg_raw_aisles:
       +enabled: true
-      +config:
-        delimiter: ','   
-        strict_mode: false
+      +delimiter: ','
+      +strict: false 
+
     stg_raw_products:
       +enabled: true
-      +config:
-        delimiter: ','   
-        strict_mode: false
-    stg_raw_users: 
-      +enabled: true
-      +config:
-        delimiter: ','   
-        strict_mode: false
-    stg_raw_departments: 
-      +enabled: true
-      +config:
-        delimiter: ','   
-        strict_mode: false      
+      +delimiter: ','
+      +strict: false
 
+    stg_raw_users:
+      +enabled: true
+      +delimiter: ','
+      +strict: false
 
+    stg_raw_departments:
+      +enabled: true
+      +delimiter: ','
+      +strict: false

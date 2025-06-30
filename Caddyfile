@@ -1,12 +1,6 @@
 :3000 {
     
     encode gzip
-
-    # db explorer
-    route /db-admin* { 
-        reverse_proxy db-explorer:8081
-    }
-
     # prefect ui
     route /prefect* { 
         reverse_proxy prefect:4200

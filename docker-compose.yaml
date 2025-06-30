@@ -70,6 +70,7 @@ services:
       - DBT_PROJECT_DIR=/app/dbt_setup
       - DBT_PROFILES_DIR=/app/dbt_setup
       - MINIO_ROOT_PASSWORD=minio_secret_password
+      
       - MINIO_ROOT_USER=minioadmin
     depends_on:
       prefect:
@@ -170,55 +171,6 @@ services:
         condition: service_healthy
       kafka-connect:
         condition: service_healthy
-
-  jupyter-lab:
-    build:
-      context: ./notebooks 
-      dockerfile: Dockerfile 
-    develop:
-      watch:
-        - action: sync
-          path: .
-          target: /app
-          ignore: 
-            - .venv/
-        - action: rebuild
-          path: ./pyproject.toml
-    container_name: jupyter_lab_dabi2
-    volumes:
-      - ./notebooks:/app/
-      - jupyter_config:/root/.jupyter           
-      - jupyter_data:/root/.local/share/jupyter 
-      - jupyter_cache:/root/.cache
-      - ./src/prefect/dbt_setup:/dwh_data:ro
-      - ./data:/data 
-    ports:
-      - "8888:8888" 
-    working_dir: /app
-    environment: 
-      - OLTP_DB_HOST=db
-      - OLTP_DB_PORT=5432
-      - OLTP_DB_USER=${DB_USER:-datata1}
-      - OLTP_DB_PASSWORD=${DB_PASSWORD:-devpassword}
-      - OLTP_DB_NAME=${DB_NAME:-oltp}
-      - PREFECT_API_URL=http://prefect:4200/api
-      - DUCKDB_DWH_PATH=/dwh_data/dev.duckdb
-
-    restart: unless-stopped
-    depends_on:
-      db: 
-        condition: service_healthy
-      prefect: 
-        condition: service_started
-    command: > 
-      uv run jupyter lab
-      --ServerApp.base_url=/jupyter
-      --ServerApp.token='dabi2'
-      --ServerApp.ip='0.0.0.0'
-      --ServerApp.port=8888
-      --no-browser
-      --allow-root 
-      --NotebookApp.notebook_dir=/app/notebooks
   
   minio:
     image: minio/minio:latest
@@ -269,21 +221,6 @@ services:
       - CONSUMER_GROUP_ID=${CONSUMER_GROUP_ID} 
       - PREFECT_API_URL=http://prefect:4200/api
     restart: unless-stopped
-
-  caddy:
-    container_name: caddy_proxy_dabi2
-    image: caddy:latest
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - prefect
-      - jupyter-lab 
-      - minio
     
   fastapi-backend-dabi2:
     build:
@@ -311,12 +248,33 @@ services:
       - "3001:3001"
     environment:
       - DUCKDB_DWH_PATH=/dwh_data/dev.duckdb
+
+  clickhouse-server:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse_dwh
+    ports:
+      - "8123:8123" 
+      - "9100:9000" 
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse/
+      - clickhouse_logs:/var/log/clickhouse-server/
+    environment:
+      - CLICKHOUSE_PASSWORD=devpassword
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
 # --- Benannte Volumes für persistente Daten ---
 volumes:
   postgres_data:
-  caddy_data:
+  clickhouse_data:
+  clickhouse_logs:
   minio_data:
-  caddy_config:
-  jupyter_config:
-  jupyter_data:
-  jupyter_cache:

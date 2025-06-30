@@ -20,6 +20,7 @@ from prefect_aws.credentials import MinIOCredentials
 from flows.dwh_pipeline import cdc_minio_to_duckdb_flow as target_flow
 from flows.initial_oltp_load_flow import initial_oltp_load_flow 
 from flows.debezium_activation_flow import activate_debezium_flow 
+from flows.analytics import analytics
 
 DB_HOST = os.getenv("DB_HOST", "db")
 DB_PORT = os.getenv("DB_PORT", "5432")
@@ -65,6 +66,14 @@ DEBEZIUM_FLOW_FUNCTION_NAME = activate_debezium_flow.__name__
 DEBEZIUM_FLOW_ENTRYPOINT = f"./flows/debezium_activation_flow.py:{DEBEZIUM_FLOW_FUNCTION_NAME}" 
 DEBEZIUM_TAGS = ["debezium", "activation"]
 DEBEZIUM_DESCRIPTION = "Start Debezium Connector"
+
+# --- Konfiguration für Analytics Flow ---
+ANALYTICS_DEPLOYMENT_NAME = "train-model-flow"
+ANALYTICS_FLOW_SCRIPT_PATH = Path("./flows/analytics.py") 
+ANALYTICS_FLOW_FUNCTION_NAME = analytics.__name__ 
+ANALYTICS_FLOW_ENTRYPOINT = f"./flows/analytics.py:{ANALYTICS_FLOW_FUNCTION_NAME}" 
+ANALYTICS_TAGS = ["analytics", "model-training"]
+ANALYTICS_DESCRIPTION = "Train model and make predictions on data from DWH"
 
 async def check_oltp_database_readiness(logger_param: logging.Logger) -> bool:
     logger_param.info("Checking OLTP database readiness for Debezium...")
@@ -293,6 +302,44 @@ async def main():
                  logger.info(f"debezium Deployment '{DEBEZIUM_DEPLOYMENT_NAME}' (ID: {debezium_deployment_id_to_trigger}) erfolgreich erstellt/aktualisiert.")
             else:
                  logger.error(f"FEHLER: debezium Deployment erstellt, aber keine ID in Antwort gefunden: {debezium_deployment_data}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"FEHLER bei DWH Deployment HTTP-Anfrage: {e}", file=sys.stderr)
+            if hasattr(e, 'response') and e.response is not None: logger.info(f"Response Body: {e.response.text}", file=sys.stderr)
+        except Exception as e:
+            logger.error(f"FEHLER beim Erstellen/Verarbeiten des DWH Deployments: {e}", file=sys.stderr)
+            traceback.logger.info_exc(file=sys.stderr) 
+
+        # Deployment analytics flow
+        # TODO: change that
+        logger.info(f"\n--- Deploying ANALYTICS Flow: {ANALYTICS_DEPLOYMENT_NAME} ---")
+        try:
+            logger.info(f"Ermittle Flow ID für Funktion: {ANALYTICS_FLOW_FUNCTION_NAME}")
+            analytics_flow_id = await client.create_flow_from_name(ANALYTICS_FLOW_FUNCTION_NAME)
+            logger.info(f"Flow ID for ANALYTICS Load: {analytics_flow_id}")
+
+            logger.info(f"Sende POST request für ANALYTICS Deployment...")
+            analytics_deployment_response = requests.post(
+                f"http://prefect:4200/api/deployments",
+                json={
+                    "name": ANALYTICS_DEPLOYMENT_NAME,
+                    "flow_id": str(analytics_flow_id),
+                    "work_pool_name": WORK_POOL_NAME,
+                    "entrypoint": ANALYTICS_FLOW_ENTRYPOINT,
+                    "enforce_parameter_schema": False,
+                    "path": str(APP_BASE_PATH),
+                    "tags": ANALYTICS_TAGS,
+                    "description": ANALYTICS_DESCRIPTION,
+                },
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            analytics_deployment_response.raise_for_status()
+            analytics_deployment_data = analytics_deployment_response.json()
+            analytics_deployment_id_to_trigger = analytics_deployment_data.get('id')
+            if analytics_deployment_id_to_trigger:
+                 logger.info(f"ANALYTICS Deployment '{ANALYTICS_DEPLOYMENT_NAME}' (ID: {analytics_deployment_id_to_trigger}) erfolgreich erstellt/aktualisiert.")
+            else:
+                 logger.error(f"FEHLER: analytics Deployment erstellt, aber keine ID in Antwort gefunden: {analytics_deployment_data}")
         except requests.exceptions.RequestException as e:
             logger.error(f"FEHLER bei DWH Deployment HTTP-Anfrage: {e}", file=sys.stderr)
             if hasattr(e, 'response') and e.response is not None: logger.info(f"Response Body: {e.response.text}", file=sys.stderr)

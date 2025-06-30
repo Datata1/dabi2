@@ -1,4 +1,5 @@
 import duckdb
+import os
 from datetime import datetime
 from minio import Minio
 from minio.error import S3Error
@@ -7,8 +8,11 @@ from prefect import flow, task, get_run_logger
 from prefect_aws.credentials import MinIOCredentials 
 from pathlib import Path
 import time
+import clickhouse_connect
+
 
 from tasks.run_dbt_runner import run_dbt_command_runner
+from utils.schema import get_staging_table_schema
 
 # --- Konfiguration ---
 MINIO_BUCKET = "datalake"
@@ -26,6 +30,11 @@ MINIO_USE_SSL = False
 APP_DIR = Path("/app")
 DBT_PROJECT_DIR = APP_DIR / "dbt_setup"
 DBT_PROFILES_DIR = DBT_PROJECT_DIR
+
+CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "clickhouse-server")
+CLICKHOUSE_PORT = int(os.getenv("CLICKHOUSE_PORT", 8123))
+CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "default")
+CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "devpassword")
 
 # --- Tasks ---
 @task(retries=1, retry_delay_seconds=5)
@@ -69,6 +78,97 @@ def find_new_files_in_minio(
          logger.error(f"Anderer Fehler beim Auflisten der Objekte: {e_list}", exc_info=True)
          raise
     return new_files
+
+@task()
+def load_files_to_clickhouse_staging(
+    files_to_process: list[str],
+    staging_table_prefix: str,
+):
+    """
+    Lädt Parquet-Dateien aus MinIO direkt in Staging-Tabellen in ClickHouse.
+    """
+    logger = get_run_logger()
+    if not files_to_process:
+        logger.info("Keine neuen Dateien zum Laden in ClickHouse.")
+        return False
+
+    try:
+        # Verbindung zum ClickHouse-Server herstellen
+        client = clickhouse_connect.get_client(
+            host=CLICKHOUSE_HOST,
+            port=CLICKHOUSE_PORT,
+            user=CLICKHOUSE_USER,
+            password=CLICKHOUSE_PASSWORD,
+            database="default" # Die Zieldatenbank in ClickHouse
+        )
+        logger.info(f"Erfolgreich mit ClickHouse auf {CLICKHOUSE_HOST}:{CLICKHOUSE_PORT} verbunden.")
+    except Exception as e:
+        logger.error(f"Fehler bei der Verbindung zu ClickHouse: {e}")
+        raise
+
+    # S3-Credentials für die ClickHouse-Funktion holen
+    minio_creds = MinIOCredentials.load(MINIO_BLOCK_NAME)
+    access_key = minio_creds.minio_root_user
+    secret_key = minio_creds.minio_root_password.get_secret_value()
+
+    # S3-URL-Struktur definieren (ohne http://)
+    s3_url_base = f"http://{MINIO_SERVICE_NAME}:{MINIO_PORT}/{MINIO_BUCKET}/"
+
+    for file_path_s3 in files_to_process:
+        try:
+            # Extrahiere Tabellenname aus dem Dateipfad, z.B. "orders"
+            object_key = file_path_s3.split(f"s3://{MINIO_BUCKET}/", 1)[-1]
+            table_name_from_path = object_key.split('/')[1] # Annahme: /cdc_events/orders/...
+            target_staging_table = f"{staging_table_prefix}{table_name_from_path}"
+            
+            # S3-URL für die ClickHouse-Funktion
+            s3_full_url = f"{s3_url_base}{object_key}"
+
+            create_table_ddl = get_staging_table_schema(table_name_from_path)
+            client.command(create_table_ddl)
+
+            parquet_schema_definition = ""
+            if table_name_from_path == "aisles":
+                parquet_schema_definition = "aisle_id Int64, aisle String, _op String, _ts_ms Int64"
+            elif table_name_from_path == "products":
+                parquet_schema_definition = "product_id Int64, product_name String, aisle_id Nullable(Int64), department_id Nullable(Int64), _op String, _ts_ms Int64"
+            elif table_name_from_path == "departments":
+                parquet_schema_definition = "department_id Int64, department String, _op String, _ts_ms Int64"
+            elif table_name_from_path == "users":
+                parquet_schema_definition = "user_id Int64, _op String, _ts_ms Int64"
+            elif table_name_from_path == "orders":
+                parquet_schema_definition = "order_id Int64, user_id Int64, order_date Int64, tip_given Nullable(Boolean), _op String, _ts_ms Int64"
+            elif table_name_from_path == "order_products":
+                parquet_schema_definition = "order_id Int64, product_id Int64, add_to_cart_order Int64, _op String, _ts_ms Int64"
+            
+            if not parquet_schema_definition:
+                raise ValueError(f"Keine Parquet-Schema-Definition für Tabelle '{table_name_from_path}' gefunden. Kann nicht laden.")
+
+
+            insert_sql = f"""
+            INSERT INTO default_raw_seeds.{target_staging_table}
+            SELECT 
+                * EXCEPT (_ts_ms), -- Wähle alle Spalten außer _ts_ms
+                fromUnixTimestamp64Milli(_ts_ms) AS _ts_ms,
+                now() as load_ts
+            FROM s3(
+                '{s3_full_url}',
+                '{access_key}',
+                '{secret_key}',
+                'Parquet',
+                '{parquet_schema_definition}'
+            );
+            """
+            client.command(insert_sql)
+            logger.info(f"Erfolgreich Daten in {target_staging_table} eingefügt.")
+
+        except Exception as e:
+            logger.error(f"Fehler beim Laden der Datei {file_path_s3} nach ClickHouse: {e}", exc_info=True)
+            # In einem echten Szenario würde man hier eine bessere Fehlerbehandlung implementieren
+            continue
+
+    logger.info("Ladevorgang nach ClickHouse abgeschlossen.")
+    return True
 
 @task()
 def load_files_to_duckdb_staging( 
@@ -247,11 +347,9 @@ def cdc_minio_to_duckdb_flow():
 
         logger.info(f"Verarbeite {len(new_files_list)} neue Dateien.")
 
-        load_staging_success = load_files_to_duckdb_staging(
+        load_staging_success = load_files_to_clickhouse_staging(
             files_to_process=new_files_list,
-            duckdb_path=DUCKDB_PATH,
             staging_table_prefix=STAGING_TABLE_PREFIX,
-            minio_endpoint_for_duckdb=MINIO_DUCKDB_ENDPOINT,
         )
         if not load_staging_success: 
             logger.error("Laden der Staging-Daten fehlgeschlagen. Breche Flow ab.")
@@ -271,7 +369,7 @@ def cdc_minio_to_duckdb_flow():
 
         logger.info("Running DBT Staging models...")
         staging_result = run_dbt_command_runner( 
-            dbt_args=["build", "--resource-type", "model", "--resource-type", "snapshot"],
+            dbt_args=["build", "--resource-type", "model", "--resource-type", "snapshot" ],
             project_dir=DBT_PROJECT_DIR,
             profiles_dir=DBT_PROFILES_DIR
         )
@@ -287,6 +385,18 @@ def cdc_minio_to_duckdb_flow():
              minio_endpoint=MINIO_RAW_ENDPOINT,
         )
         logger.info("Dateien erfolgreich archiviert.")
+
+        logger.info("Running DBT test...")
+        test_status = run_dbt_command_runner( 
+            dbt_args=["test"],
+            project_dir=DBT_PROJECT_DIR,
+            profiles_dir=DBT_PROFILES_DIR
+        )
+        if not test_status:
+            logger.error("DBT debug fehlgeschlagen. Breche Flow ab.")
+            return "DBT test fehlgeschlagen."
+        logger.info("DBT test erfolgreich.")
+
         final_message = "CDC Flow erfolgreich abgeschlossen."
 
     except Exception as e:

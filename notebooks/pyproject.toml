@@ -14,4 +14,6 @@ dependencies = [
     "statsmodels>=0.14.4",
     "seaborn>=0.13.2",
     "scikit-learn>=1.6.1",
+    "clickhouse-connect>=0.8.18",
+    "rich>=14.0.0",
 ]

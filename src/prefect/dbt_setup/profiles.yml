@@ -1,6 +1,18 @@
 dbt_setup:
-  target: dev
+  target: dev_clickhouse
   outputs:
+
+    dev_clickhouse:
+      type: clickhouse
+      schema: default 
+      host: localhost 
+      port: 8123
+      user: default
+      password: "devpassword" 
+      connect_timeout: 15
+      send_receive_timeout: 300
+      sync_request_timeout: 300
+
     dev:
       type: duckdb
       path: /app/dbt_setup/dev.duckdb
