@@ -68,7 +68,6 @@ def make_final_predictions(
     lags: int,
     min_date_from_training: pd.Timestamp
 ) -> pd.DataFrame:
-    df_for_prediction = data_frame.copy()
 
     data_frame_features = feature_engineering(
         data_frame,
