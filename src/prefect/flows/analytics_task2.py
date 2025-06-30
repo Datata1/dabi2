@@ -3,7 +3,7 @@ from prefect import flow, get_run_logger
 import clickhouse_connect
 
 # task imports
-from tasks.analytics.load_data_clickhouse import load_data_clickhouse
+from tasks.analytics.load_data_clickhouse import process_data_from_csv
 from tasks.analytics.trend_bereinigung import remove_trends_and_seasons
 from tasks.analytics.feature_engineering import feature_engineering
 from tasks.analytics.predictions import make_predictions
@@ -19,43 +19,41 @@ CLICKHOUSE_PORT = int(os.getenv("CLICKHOUSE_PORT", 8123))
 CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "default")
 CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "devpassword")
 
+
 @flow(name="Analytics Flow")
-def analytics():
+def analytics2():
     pass
-
-    # TODO: which tasks needs to be async?
-
     logger = get_run_logger()
     logger.info("Starting analytics flow...")
 
     # 1.
     # load data (either csv or clickhouse is fine)
-    df = load_data_clickhouse(
-        host=CLICKHOUSE_HOST,
-        port=CLICKHOUSE_PORT,
-        user=CLICKHOUSE_USER,
-        password=CLICKHOUSE_PASSWORD
-    )
+    tips, orders_tips, tip_temp_test = process_data_from_csv()
+
+    logger.info(orders_tips.head())
 
     # 2.
     # trend bereinigung und saison bereinigung
-    df = remove_trends_and_seasons(df)
-
-    # 3.
-    # feature engineering
-    df = feature_engineering(df)
+    df = remove_trends_and_seasons(df=orders_tips, lags=4, min_date_global=orders_tips.order_date.min())
 
     # 4.
     # modell training
     # -> save model?
-    model = train_prediction_model(df)
+    final_model_for_pred, final_preprocessor_for_pred, min_date_for_pred, acc_mean = train_prediction_model(df, 4)
 
-    # 5. evaluation
-    # show metrics
-    print_model_evaluation(model)
 
     # 6. prediction 
     # make predictions on csv data set and save predictions to csv
-    predictions = make_predictions(model, df)
+    predictions = make_predictions(
+        data_frame=tip_temp_test,
+        trained_model=final_model_for_pred,
+        trained_preprocessor=final_preprocessor_for_pred,
+        lags=4,
+        min_date_from_training=min_date_for_pred
+    )
+
+    predictions.to_csv("/app/data/task_2g_pred.csv")
+
+
     logger.info("Analytics flow completed successfully.")
 

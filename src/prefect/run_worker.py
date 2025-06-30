@@ -20,7 +20,8 @@ from prefect_aws.credentials import MinIOCredentials
 from flows.dwh_pipeline import cdc_minio_to_duckdb_flow as target_flow
 from flows.initial_oltp_load_flow import initial_oltp_load_flow 
 from flows.debezium_activation_flow import activate_debezium_flow 
-from flows.analytics import analytics
+from flows.analytics_task2 import analytics2 as analytics2
+from flows.analytics_task3 import analytics3 as analytics3
 
 DB_HOST = os.getenv("DB_HOST", "db")
 DB_PORT = os.getenv("DB_PORT", "5432")
@@ -68,12 +69,20 @@ DEBEZIUM_TAGS = ["debezium", "activation"]
 DEBEZIUM_DESCRIPTION = "Start Debezium Connector"
 
 # --- Konfiguration für Analytics Flow ---
-ANALYTICS_DEPLOYMENT_NAME = "train-model-flow"
-ANALYTICS_FLOW_SCRIPT_PATH = Path("./flows/analytics.py") 
-ANALYTICS_FLOW_FUNCTION_NAME = analytics.__name__ 
-ANALYTICS_FLOW_ENTRYPOINT = f"./flows/analytics.py:{ANALYTICS_FLOW_FUNCTION_NAME}" 
-ANALYTICS_TAGS = ["analytics", "model-training"]
-ANALYTICS_DESCRIPTION = "Train model and make predictions on data from DWH"
+ANALYTICS2_DEPLOYMENT_NAME = "train-model-flow"
+ANALYTICS2_FLOW_SCRIPT_PATH = Path("./flows/analytics_task2.py") 
+ANALYTICS2_FLOW_FUNCTION_NAME = analytics2.__name__ 
+ANALYTICS2_FLOW_ENTRYPOINT = f"./flows/analytics_task2.py:{ANALYTICS2_FLOW_FUNCTION_NAME}" 
+ANALYTICS2_TAGS = ["analytics2", "model-training"]
+ANALYTICS2_DESCRIPTION = "Train model and make predictions on data from DWH"
+
+# --- Konfiguration für Analytics Flow ---
+ANALYTICS3_DEPLOYMENT_NAME = "train-model-flow"
+ANALYTICS3_FLOW_SCRIPT_PATH = Path("./flows/analytics_task3.py") 
+ANALYTICS3_FLOW_FUNCTION_NAME = analytics3.__name__ 
+ANALYTICS3_FLOW_ENTRYPOINT = f"./flows/analytics_task3.py:{ANALYTICS3_FLOW_FUNCTION_NAME}" 
+ANALYTICS3_TAGS = ["analytics3", "model-training"]
+ANALYTICS3_DESCRIPTION = "Train model and make predictions on data from DWH"
 
 async def check_oltp_database_readiness(logger_param: logging.Logger) -> bool:
     logger_param.info("Checking OLTP database readiness for Debezium...")
@@ -311,41 +320,77 @@ async def main():
 
         # Deployment analytics flow
         # TODO: change that
-        logger.info(f"\n--- Deploying ANALYTICS Flow: {ANALYTICS_DEPLOYMENT_NAME} ---")
+        logger.info(f"\n--- Deploying ANALYTICS2 Flow: {ANALYTICS2_DEPLOYMENT_NAME} ---")
         try:
-            logger.info(f"Ermittle Flow ID für Funktion: {ANALYTICS_FLOW_FUNCTION_NAME}")
-            analytics_flow_id = await client.create_flow_from_name(ANALYTICS_FLOW_FUNCTION_NAME)
-            logger.info(f"Flow ID for ANALYTICS Load: {analytics_flow_id}")
+            logger.info(f"Ermittle Flow ID für Funktion: {ANALYTICS2_FLOW_FUNCTION_NAME}")
+            analytics2_flow_id = await client.create_flow_from_name(ANALYTICS2_FLOW_FUNCTION_NAME)
+            logger.info(f"Flow ID for ANALYTICS2 Load: {analytics2_flow_id}")
 
-            logger.info(f"Sende POST request für ANALYTICS Deployment...")
-            analytics_deployment_response = requests.post(
+            logger.info(f"Sende POST request für ANALYTICS2 Deployment...")
+            analytics2_deployment_response = requests.post(
                 f"http://prefect:4200/api/deployments",
                 json={
-                    "name": ANALYTICS_DEPLOYMENT_NAME,
-                    "flow_id": str(analytics_flow_id),
+                    "name": ANALYTICS2_DEPLOYMENT_NAME,
+                    "flow_id": str(analytics2_flow_id),
                     "work_pool_name": WORK_POOL_NAME,
-                    "entrypoint": ANALYTICS_FLOW_ENTRYPOINT,
+                    "entrypoint": ANALYTICS2_FLOW_ENTRYPOINT,
                     "enforce_parameter_schema": False,
                     "path": str(APP_BASE_PATH),
-                    "tags": ANALYTICS_TAGS,
-                    "description": ANALYTICS_DESCRIPTION,
+                    "tags": ANALYTICS2_TAGS,
+                    "description": ANALYTICS2_DESCRIPTION,
                 },
                 headers={"Content-Type": "application/json"},
                 timeout=30
             )
-            analytics_deployment_response.raise_for_status()
-            analytics_deployment_data = analytics_deployment_response.json()
-            analytics_deployment_id_to_trigger = analytics_deployment_data.get('id')
-            if analytics_deployment_id_to_trigger:
-                 logger.info(f"ANALYTICS Deployment '{ANALYTICS_DEPLOYMENT_NAME}' (ID: {analytics_deployment_id_to_trigger}) erfolgreich erstellt/aktualisiert.")
+            analytics2_deployment_response.raise_for_status()
+            analytics2_deployment_data = analytics2_deployment_response.json()
+            analytics2_deployment_id_to_trigger = analytics2_deployment_data.get('id')
+            if analytics2_deployment_id_to_trigger:
+                 logger.info(f"ANALYTICS2 Deployment '{ANALYTICS2_DEPLOYMENT_NAME}' (ID: {analytics2_deployment_id_to_trigger}) erfolgreich erstellt/aktualisiert.")
             else:
-                 logger.error(f"FEHLER: analytics Deployment erstellt, aber keine ID in Antwort gefunden: {analytics_deployment_data}")
+                 logger.error(f"FEHLER: analytics2 Deployment erstellt, aber keine ID in Antwort gefunden: {analytics2_deployment_data}")
         except requests.exceptions.RequestException as e:
             logger.error(f"FEHLER bei DWH Deployment HTTP-Anfrage: {e}", file=sys.stderr)
             if hasattr(e, 'response') and e.response is not None: logger.info(f"Response Body: {e.response.text}", file=sys.stderr)
         except Exception as e:
             logger.error(f"FEHLER beim Erstellen/Verarbeiten des DWH Deployments: {e}", file=sys.stderr)
-            traceback.logger.info_exc(file=sys.stderr) 
+            traceback.logger.info_exc(file=sys.stderr)
+
+        logger.info(f"\n--- Deploying ANALYTICS3 Flow: {ANALYTICS3_DEPLOYMENT_NAME} ---")
+        try:
+            logger.info(f"Ermittle Flow ID für Funktion: {ANALYTICS3_FLOW_FUNCTION_NAME}")
+            analytics3_flow_id = await client.create_flow_from_name(ANALYTICS3_FLOW_FUNCTION_NAME)
+            logger.info(f"Flow ID for ANALYTICS3 Load: {analytics3_flow_id}")
+
+            logger.info(f"Sende POST request für ANALYTICS3 Deployment...")
+            analytics3_deployment_response = requests.post(
+                f"http://prefect:4200/api/deployments",
+                json={
+                    "name": ANALYTICS3_DEPLOYMENT_NAME,
+                    "flow_id": str(analytics3_flow_id),
+                    "work_pool_name": WORK_POOL_NAME,
+                    "entrypoint": ANALYTICS3_FLOW_ENTRYPOINT,
+                    "enforce_parameter_schema": False,
+                    "path": str(APP_BASE_PATH),
+                    "tags": ANALYTICS3_TAGS,
+                    "description": ANALYTICS3_DESCRIPTION,
+                },
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            analytics3_deployment_response.raise_for_status()
+            analytics3_deployment_data = analytics3_deployment_response.json()
+            analytics3_deployment_id_to_trigger = analytics3_deployment_data.get('id')
+            if analytics3_deployment_id_to_trigger:
+                 logger.info(f"ANALYTICS3 Deployment '{ANALYTICS3_DEPLOYMENT_NAME}' (ID: {analytics3_deployment_id_to_trigger}) erfolgreich erstellt/aktualisiert.")
+            else:
+                 logger.error(f"FEHLER: analytics3 Deployment erstellt, aber keine ID in Antwort gefunden: {analytics3_deployment_data}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"FEHLER bei DWH Deployment HTTP-Anfrage: {e}", file=sys.stderr)
+            if hasattr(e, 'response') and e.response is not None: logger.info(f"Response Body: {e.response.text}", file=sys.stderr)
+        except Exception as e:
+            logger.error(f"FEHLER beim Erstellen/Verarbeiten des DWH Deployments: {e}", file=sys.stderr)
+            traceback.logger.info_exc(file=sys.stderr)  
 
         if not db_is_populated: 
             try:
